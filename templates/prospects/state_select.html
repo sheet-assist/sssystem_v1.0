@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Select State - {{ type_display }}{% endblock %}
+{% block extra_css %}
+<style>
+  .hover-card {
+    transition: background-color 0.2s ease;
+  }
+  
+  .hover-card:hover {
+    background-color: #e3f2fd;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{# Breadcrumb #}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'prospects:type_select' %}">Prospects</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ type_display }}</li>
+    <li class="breadcrumb-item active" aria-current="page">Select State</li>
+  </ol>
+</nav>
+
+<h2 class="mb-4">{{ type_display }} &mdash; Select State</h2>
+
+<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3">
+  {% for state in states %}
+  <div class="col">
+    <a href="{% url 'prospects:county_select' prospect_type state.abbreviation %}" class="text-decoration-none">
+      <div class="card h-100 border-secondary hover-card">
+        <div class="card-body text-center">
+          <h5 class="card-title text-dark mb-1">{{ state.name }}</h5>
+          <span class="badge bg-secondary">{{ state.abbreviation }}</span>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% empty %}
+  <div class="col-12">
+    <div class="alert alert-info">No active states found.</div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

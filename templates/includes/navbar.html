@@ -1,0 +1,74 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand d-flex flex-column lh-1" href="{% url 'dashboard:home' %}">
+      <span class="fw-bold">Surplus Squad
+      <small class="text-light opacity-75" style="font-size:.7rem;">SSSys<sup>TM</sup></small>
+    </span>
+    
+    </a>
+
+    <button class="navbar-toggler" type="button"
+            data-bs-toggle="collapse" data-bs-target="#mainNav"
+            aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="mainNav">
+      {% if user.is_authenticated %}
+      <ul class="navbar-nav me-auto">
+        {% if user.profile.can_view_prospects or user.is_superuser %}
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.app_name == 'prospects' %}active{% endif %}"
+             href="{% url 'prospects:type_select' %}">
+            <i class="bi bi-search"></i> Prospects
+          </a>
+        </li>
+        {% endif %}
+
+        {% if user.profile.can_view_cases or user.is_superuser %}
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.app_name == 'cases' %}active{% endif %}"
+             href="{% url 'cases:list' %}">
+            <i class="bi bi-folder2-open"></i> Cases
+          </a>
+        </li>
+        {% endif %}
+
+        {% if user.profile.is_admin or user.is_superuser %}
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.app_name == 'scraper' %}active{% endif %}"
+             href="{% url 'scraper:dashboard' %}">
+            <i class="bi bi-robot"></i> Scraper
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.app_name == 'settings_app' %}active{% endif %}"
+             href="{% url 'settings_app:home' %}">
+            <i class="bi bi-gear"></i> Settings
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+
+      <ul class="navbar-nav">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="userMenu"
+             role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-person-circle"></i> {{ user.get_full_name|default:user.username }}
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+            <li><span class="dropdown-item-text text-muted small">{{ user.profile.get_role_display }}</span></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{% url 'accounts:profile' %}"><i class="bi bi-person"></i> Profile</a></li>
+            {% if user.is_superuser %}
+            <li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="bi bi-shield-lock"></i> Admin</a></li>
+            {% endif %}
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{% url 'accounts:logout' %}"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+          </ul>
+        </li>
+      </ul>
+      {% endif %}
+    </div>
+  </div>
+</nav>

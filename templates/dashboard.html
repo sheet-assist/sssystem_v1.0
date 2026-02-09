@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h2>Dashboard</h2>
+<p class="text-muted">Welcome to Surplus Squad. Select a tab above to get started.</p>
+
+<div class="row g-3 mt-3">
+  <div class="col-md-4">
+    <div class="card text-center">
+      <div class="card-body">
+        <h5 class="card-title">Prospects</h5>
+        <p class="display-6">-</p>
+        <p class="text-muted">Total prospects</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center">
+      <div class="card-body">
+        <h5 class="card-title">Cases</h5>
+        <p class="display-6">-</p>
+        <p class="text-muted">Active cases</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center">
+      <div class="card-body">
+        <h5 class="card-title">Last Scrape</h5>
+        <p class="display-6">-</p>
+        <p class="text-muted">Most recent run</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

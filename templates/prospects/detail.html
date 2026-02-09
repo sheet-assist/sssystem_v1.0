@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Prospect {{ object.case_number }}{% endblock %}
+
+{% block content %}
+{# Breadcrumb #}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'prospects:type_select' %}">Prospects</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ object.case_number }}</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0">{{ object.case_number }}</h2>
+  <span class="badge fs-6
+    {% if object.workflow_status == 'new' %}bg-secondary
+    {% elif object.workflow_status == 'assigned' %}bg-primary
+    {% elif object.workflow_status == 'researching' %}bg-info text-dark
+    {% elif object.workflow_status == 'skip_tracing' %}bg-warning text-dark
+    {% elif object.workflow_status == 'contacting' %}bg-warning
+    {% elif object.workflow_status == 'contract_sent' %}bg-success
+    {% elif object.workflow_status == 'converted' %}bg-success
+    {% elif object.workflow_status == 'dead' %}bg-danger
+    {% else %}bg-light text-dark{% endif %}">
+    {{ object.get_workflow_status_display }}
+  </span>
+</div>
+
+{# Action Buttons #}
+<div class="mb-4">
+  <a href="{% url 'prospects:assign' object.pk %}" class="btn btn-outline-primary btn-sm me-1">
+    <i class="bi bi-person-plus"></i> Assign
+  </a>
+  <a href="{% url 'prospects:note_add' object.pk %}" class="btn btn-outline-secondary btn-sm me-1">
+    <i class="bi bi-sticky"></i> Add Note
+  </a>
+  <a href="{% url 'prospects:research' object.pk %}" class="btn btn-outline-info btn-sm me-1">
+    <i class="bi bi-search"></i> Research
+  </a>
+  <a href="{% url 'prospects:transition' object.pk %}" class="btn btn-outline-warning btn-sm me-1">
+    <i class="bi bi-arrow-left-right"></i> Transition
+  </a>
+  <a href="{% url 'prospects:history' object.pk %}" class="btn btn-outline-dark btn-sm me-1">
+    <i class="bi bi-clock-history"></i> History
+  </a>
+  {% if object.workflow_status == 'contract_sent' or object.workflow_status == 'converted' %}
+  <a href="{% url 'cases:convert' object.pk %}" class="btn btn-success btn-sm">
+    <i class="bi bi-box-arrow-in-right"></i> Convert to Case
+  </a>
+  {% endif %}
+</div>
+
+<div class="row">
+  {# Left Column #}
+  <div class="col-lg-8">
+
+    {# Identity Card #}
+    <div class="card mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-card-heading me-1"></i> Identity</div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-sm-6">
+            <p class="mb-1"><strong>Type:</strong> {{ object.get_prospect_type_display }}</p>
+            <p class="mb-1"><strong>Case #:</strong> {{ object.case_number }}</p>
+          </div>
+          <div class="col-sm-6">
+            <p class="mb-1"><strong>Case Style:</strong> {{ object.case_style|default:"-" }}</p>
+            <p class="mb-1"><strong>Auction Item:</strong> {{ object.auction_item_number|default:"-" }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# Location Card #}
+    <div class="card mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-geo-alt me-1"></i> Location</div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-sm-6">
+            <p class="mb-1"><strong>County:</strong> {{ object.county }}</p>
+            <p class="mb-1"><strong>Address:</strong> {{ object.property_address|default:"-" }}</p>
+            <p class="mb-1"><strong>City:</strong> {{ object.city|default:"-" }}</p>
+          </div>
+          <div class="col-sm-6">
+            <p class="mb-1"><strong>State:</strong> {{ object.state|default:"-" }}</p>
+            <p class="mb-1"><strong>Zip:</strong> {{ object.zip_code|default:"-" }}</p>
+            <p class="mb-1"><strong>Parcel ID:</strong> {{ object.parcel_id|default:"-" }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# Financial Card #}
+    <div class="card mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-currency-dollar me-1"></i> Financial</div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-sm-6">
+            <p class="mb-1"><strong>Final Judgment:</strong> {% if object.final_judgment_amount %}${{ object.final_judgment_amount|floatformat:2 }}{% else %}-{% endif %}</p>
+            <p class="mb-1"><strong>Opening Bid:</strong> {% if object.opening_bid %}${{ object.opening_bid|floatformat:2 }}{% else %}-{% endif %}</p>
+            <p class="mb-1"><strong>Plaintiff Max Bid:</strong> {% if object.plaintiff_max_bid %}${{ object.plaintiff_max_bid|floatformat:2 }}{% else %}-{% endif %}</p>
+          </div>
+          <div class="col-sm-6">
+            <p class="mb-1"><strong>Assessed Value:</strong> {% if object.assessed_value %}${{ object.assessed_value|floatformat:2 }}{% else %}-{% endif %}</p>
+            <p class="mb-1"><strong>Surplus:</strong> {% if object.surplus_amount %}${{ object.surplus_amount|floatformat:2 }}{% else %}-{% endif %}</p>
+            <p class="mb-1"><strong>Sale Amount:</strong> {% if object.sale_amount %}${{ object.sale_amount|floatformat:2 }}{% else %}-{% endif %}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# Parties Card #}
+    <div class="card mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-people me-1"></i> Parties</div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-sm-6">
+            <p class="mb-1"><strong>Plaintiff:</strong> {{ object.plaintiff_name|default:"-" }}</p>
+          </div>
+          <div class="col-sm-6">
+            <p class="mb-1"><strong>Defendant:</strong> {{ object.defendant_name|default:"-" }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# Notes Card #}
+    <div class="card mb-3">
+      <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-sticky me-1"></i> Notes</span>
+        <a href="{% url 'prospects:note_add' object.pk %}" class="btn btn-sm btn-outline-primary">Add Note</a>
+      </div>
+      <div class="card-body">
+        {% for note in object.notes.all %}
+        <div class="border-bottom pb-2 mb-2{% if forloop.last %} border-bottom-0 pb-0 mb-0{% endif %}">
+          <div class="d-flex justify-content-between">
+            <strong>{{ note.author.get_full_name|default:note.author.username }}</strong>
+            <small class="text-muted">{{ note.created_at|date:"m/d/Y H:i" }}</small>
+          </div>
+          <p class="mb-0 mt-1">{{ note.content|linebreaksbr }}</p>
+        </div>
+        {% empty %}
+        <p class="text-muted mb-0">No notes yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+  {# Right Column #}
+  <div class="col-lg-4">
+
+    {# Schedule Card #}
+    <div class="card mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-calendar-event me-1"></i> Schedule</div>
+      <div class="card-body">
+        <p class="mb-1"><strong>Auction Date:</strong> {{ object.auction_date|date:"m/d/Y"|default:"-" }}</p>
+        <p class="mb-1"><strong>Auction Time:</strong> {{ object.auction_time|time:"h:i A"|default:"-" }}</p>
+        <p class="mb-1"><strong>Status:</strong> {{ object.get_auction_status_display|default:"-" }}</p>
+      </div>
+    </div>
+
+    {# Status Card #}
+    <div class="card mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-flag me-1"></i> Status</div>
+      <div class="card-body">
+        <p class="mb-1"><strong>Qualification:</strong>
+          {% if object.qualification_status == 'qualified' %}
+            <span class="badge bg-success">Qualified</span>
+          {% elif object.qualification_status == 'disqualified' %}
+            <span class="badge bg-danger">Disqualified</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">Pending</span>
+          {% endif %}
+        </p>
+        <p class="mb-1"><strong>Workflow:</strong> {{ object.get_workflow_status_display }}</p>
+        <p class="mb-1"><strong>Assigned To:</strong>
+          {% if object.assigned_to %}
+            {{ object.assigned_to.get_full_name|default:object.assigned_to.username }}
+          {% else %}
+            <span class="text-muted">Unassigned</span>
+          {% endif %}
+        </p>
+        {% if object.assigned_by %}
+        <p class="mb-1"><strong>Assigned By:</strong> {{ object.assigned_by.get_full_name|default:object.assigned_by.username }}</p>
+        {% endif %}
+        {% if object.assigned_at %}
+        <p class="mb-1"><strong>Assigned At:</strong> {{ object.assigned_at|date:"m/d/Y H:i" }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Research Card #}
+    <div class="card mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-clipboard-check me-1"></i> Research</div>
+      <div class="card-body">
+        <p class="mb-1">
+          <i class="bi {% if object.lien_check_done %}bi-check-circle-fill text-success{% else %}bi-circle text-muted{% endif %} me-1"></i>
+          Lien Check
+        </p>
+        {% if object.lien_check_notes %}
+        <p class="mb-1 ms-4 small text-muted">{{ object.lien_check_notes|truncatewords:20 }}</p>
+        {% endif %}
+        <p class="mb-1">
+          <i class="bi {% if object.surplus_verified %}bi-check-circle-fill text-success{% else %}bi-circle text-muted{% endif %} me-1"></i>
+          Surplus Verified
+        </p>
+        <p class="mb-1">
+          <i class="bi {% if object.documents_verified %}bi-check-circle-fill text-success{% else %}bi-circle text-muted{% endif %} me-1"></i>
+          Documents Verified
+        </p>
+      </div>
+    </div>
+
+    {# Contact Card #}
+    <div class="card mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-telephone me-1"></i> Contact</div>
+      <div class="card-body">
+        <p class="mb-1">
+          <i class="bi {% if object.skip_trace_done %}bi-check-circle-fill text-success{% else %}bi-circle text-muted{% endif %} me-1"></i>
+          Skip Trace: {% if object.skip_trace_done %}Done{% else %}Pending{% endif %}
+        </p>
+        <p class="mb-1"><strong>Contact Info:</strong></p>
+        <p class="mb-1">{{ object.owner_contact_info|default:"-"|linebreaksbr }}</p>
+        <p class="mb-0"><strong>Contact Attempts:</strong> {{ object.contact_attempts }}</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{# Recent Activity #}
+<div class="card mt-3">
+  <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-clock-history me-1"></i> Recent Activity</span>
+    <a href="{% url 'prospects:history' object.pk %}" class="btn btn-sm btn-outline-dark">View All</a>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <tbody>
+        {% for log in object.action_logs.all|slice:":5" %}
+        <tr>
+          <td class="text-muted" style="width:160px;">{{ log.created_at|date:"m/d/Y H:i" }}</td>
+          <td><span class="badge bg-secondary">{{ log.get_action_type_display }}</span></td>
+          <td>{{ log.description|default:"-" }}</td>
+          <td class="text-end text-muted">{% if log.user %}{{ log.user.get_full_name|default:log.user.username }}{% else %}System{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td class="text-center text-muted py-3" colspan="4">No activity yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

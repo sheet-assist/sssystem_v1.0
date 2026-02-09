@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+{% load math_filters %}
+{% block content %}
+<div class="container-fluid mt-4">
+  <h1>Admin Dashboard</h1>
+  <hr/>
+
+  <!-- KPI Cards Row 1 -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card bg-primary text-white">
+        <div class="card-body">
+          <h5 class="card-title">Total Prospects</h5>
+          <h2>{{ total_prospects }}</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-success text-white">
+        <div class="card-body">
+          <h5 class="card-title">Qualified</h5>
+          <h2>{{ qualified_prospects }}</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-warning text-white">
+        <div class="card-body">
+          <h5 class="card-title">Disqualified</h5>
+          <h2>{{ disqualified_prospects }}</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-info text-white">
+        <div class="card-body">
+          <h5 class="card-title">Pending Review</h5>
+          <h2>{{ pending_prospects }}</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Cards Row 2 -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Total Cases</h5>
+          <h2 class="text-primary">{{ total_cases }}</h2>
+          <small class="text-muted">Active: {{ active_cases }} | Closed: {{ closed_cases }}</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Conversion Rate</h5>
+          <h2 class="text-success">{{ conversion_rate }}%</h2>
+          <small class="text-muted">{{ converted_prospects }} converted</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Touched Prospects</h5>
+          <h2 class="text-info">{{ touched_prospects }}</h2>
+          <small class="text-muted">Untouched: {{ untouched_prospects }}</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Assigned Users</h5>
+          <h2 class="text-secondary">{{ assigned_prospects }}</h2>
+          <small class="text-muted">In pipeline</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pipeline Status -->
+  <div class="row mb-4">
+    <div class="col-lg-12">
+      <div class="card">
+        <div class="card-header">
+          <h5>Conversion Pipeline Status</h5>
+        </div>
+        <div class="card-body">
+          <div class="row text-center">
+            <div class="col-md-2">
+              <h6>New</h6>
+              <h3 class="text-primary">{{ new_prospects }}</h3>
+            </div>
+            <div class="col-md-2">
+              <h6>Assigned</h6>
+              <h3 class="text-info">{{ assigned_prospects }}</h3>
+            </div>
+            <div class="col-md-2">
+              <h6>Researching</h6>
+              <h3 class="text-warning">{{ researching_prospects }}</h3>
+            </div>
+            <div class="col-md-2">
+              <h6>Skip Tracing</h6>
+              <h3 class="text-secondary">{{ skip_tracing_prospects }}</h3>
+            </div>
+            <div class="col-md-2">
+              <h6>Contacting</h6>
+              <h3 class="text-default">{{ contacting_prospects }}</h3>
+            </div>
+            <div class="col-md-2">
+              <h6>Contract Sent</h6>
+              <h3 class="text-success">{{ contract_sent_prospects }}</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Activity & Scrape Jobs -->
+  <div class="row">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">
+          <h5>Recent Activity</h5>
+        </div>
+        <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+          <h6>Prospect Actions</h6>
+          <ul class="list-unstyled">
+            {% for action in recent_prospect_actions %}
+              <li class="mb-2 pb-2 border-bottom">
+                <small class="text-muted">{{ action.created_at|date:"M d, h:i A" }}</small><br>
+                <strong>{{ action.get_action_type_display }}</strong> on 
+                <a href="{% url 'prospects:detail' action.prospect.pk %}">
+                  {{ action.prospect.case_number }}
+                </a>
+                {% if action.user %}by <em>{{ action.user.username }}</em>{% endif %}
+                <br>
+                <small>{{ action.description }}</small>
+              </li>
+            {% empty %}
+              <li class="text-muted">No recent activity</li>
+            {% endfor %}
+          </ul>
+          <hr/>
+          <h6>Case Actions</h6>
+          <ul class="list-unstyled">
+            {% for action in recent_case_actions %}
+              <li class="mb-2 pb-2 border-bottom">
+                <small class="text-muted">{{ action.created_at|date:"M d, h:i A" }}</small><br>
+                <strong>{{ action.action_type }}</strong> on Case #{{ action.case.case_number }}
+                {% if action.user %}by <em>{{ action.user.username }}</em>{% endif %}
+              </li>
+            {% empty %}
+              <li class="text-muted">No recent case activity</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header">
+          <h5>Recent Scrape Jobs</h5>
+        </div>
+        <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+          <ul class="list-unstyled">
+            {% for job in recent_scrape_jobs %}
+              <li class="mb-3 pb-2 border-bottom">
+                <strong>{{ job.county.name }}</strong> ({{ job.job_type }})<br>
+                <small class="text-muted">{{ job.created_at|date:"M d, h:i A" }}</small><br>
+                <span class="badge badge-pill badge-{% if job.status == 'completed' %}success{% elif job.status == 'running' %}warning{% elif job.status == 'failed' %}danger{% else %}secondary{% endif %}">
+                  {{ job.get_status_display }}
+                </span>
+                {% if job.status == 'completed' %}
+                  <small>
+                    Created: {{ job.prospects_created }} | 
+                    Qualified: {{ job.prospects_qualified }}
+                  </small>
+                {% endif %}
+              </li>
+            {% empty %}
+              <li class="text-muted">No scrape jobs yet</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Counties -->
+  <div class="row mt-4">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h5>Top Counties by Prospect Count</h5>
+        </div>
+        <div class="card-body">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>County</th>
+                <th class="text-right">Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for county in county_stats %}
+                <tr>
+                  <td>{{ county.county__name }}</td>
+                  <td class="text-right"><strong>{{ county.count }}</strong></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="2" class="text-muted">No data</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h5>Qualification Summary</h5>
+        </div>
+        <div class="card-body">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th class="text-right">Count</th>
+                <th class="text-right">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Qualified</td>
+                <td class="text-right"><strong>{{ qualified_prospects }}</strong></td>
+                <td class="text-right">
+                  {{ qualified_prospects|add:disqualified_prospects|add:pending_prospects|default:0 }}
+                  {% if total_prospects > 0 %}
+                    ({{ qualified_prospects|multiply:100|divide:total_prospects|floatformat:1 }}%)
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <td>Disqualified</td>
+                <td class="text-right"><strong>{{ disqualified_prospects }}</strong></td>
+                <td class="text-right">
+                  {% if total_prospects > 0 %}
+                    ({{ disqualified_prospects|multiply:100|divide:total_prospects|floatformat:1 }}%)
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <td>Pending</td>
+                <td class="text-right"><strong>{{ pending_prospects }}</strong></td>
+                <td class="text-right">
+                  {% if total_prospects > 0 %}
+                    ({{ pending_prospects|multiply:100|divide:total_prospects|floatformat:1 }}%)
+                  {% endif %}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

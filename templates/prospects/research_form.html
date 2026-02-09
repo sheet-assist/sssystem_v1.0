@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Research - {{ prospect.case_number }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'prospects:type_select' %}">Prospects</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'prospects:detail' prospect.pk %}">{{ prospect.case_number }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Research</li>
+  </ol>
+</nav>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-search me-1"></i> Research &mdash; {{ prospect.case_number }}
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+
+          {# Checkbox fields #}
+          <div class="card bg-light mb-3">
+            <div class="card-body">
+              <h6 class="card-title mb-3">Verification Checklist</h6>
+
+              <div class="form-check mb-2">
+                {{ form.lien_check_done }}
+                <label class="form-check-label" for="{{ form.lien_check_done.id_for_label }}">
+                  Lien Check Done
+                </label>
+              </div>
+
+              <div class="form-check mb-2">
+                {{ form.surplus_verified }}
+                <label class="form-check-label" for="{{ form.surplus_verified.id_for_label }}">
+                  Surplus Verified
+                </label>
+              </div>
+
+              <div class="form-check mb-2">
+                {{ form.documents_verified }}
+                <label class="form-check-label" for="{{ form.documents_verified.id_for_label }}">
+                  Documents Verified
+                </label>
+              </div>
+
+              <div class="form-check mb-2">
+                {{ form.skip_trace_done }}
+                <label class="form-check-label" for="{{ form.skip_trace_done.id_for_label }}">
+                  Skip Trace Done
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {# Textarea fields #}
+          <div class="mb-3">
+            <label for="{{ form.lien_check_notes.id_for_label }}" class="form-label">Lien Check Notes</label>
+            {{ form.lien_check_notes }}
+            {% if form.lien_check_notes.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in form.lien_check_notes.errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.owner_contact_info.id_for_label }}" class="form-label">Owner Contact Info</label>
+            {{ form.owner_contact_info }}
+            {% if form.owner_contact_info.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in form.owner_contact_info.errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="d-flex justify-content-end gap-2">
+            <a href="{% url 'prospects:detail' prospect.pk %}" class="btn btn-outline-secondary">Cancel</a>
+            <button class="btn btn-primary" type="submit">
+              <i class="bi bi-check-lg"></i> Save Research
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

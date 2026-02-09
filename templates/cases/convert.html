@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h2>Convert Prospect to Case</h2>
+  <p>Prospect: {{ prospect }}</p>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button class="btn btn-primary" type="submit">Convert</button>
+    <a href="{{ prospect.get_absolute_url|default:'#' }}" class="btn btn-secondary">Cancel</a>
+  </form>
+{% endblock %}

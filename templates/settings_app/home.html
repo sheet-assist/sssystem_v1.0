@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<h2><i class="bi bi-gear"></i> Settings</h2>
+<div class="row g-3 mt-3">
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Filter Criteria</h5>
+        <p class="text-muted">{{ criteria_count }} active rule{{ criteria_count|pluralize }}</p>
+        <a href="{% url 'settings_app:criteria_list' %}" class="btn btn-primary btn-sm">Manage Rules</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">County Configuration</h5>
+        <p class="text-muted">Manage county URLs and scraping settings</p>
+        <a href="{% url 'admin:locations_county_changelist' %}" class="btn btn-outline-secondary btn-sm">Django Admin</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Users</h5>
+        <p class="text-muted">Manage user accounts and roles</p>
+        <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm">User List</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

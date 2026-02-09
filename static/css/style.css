@@ -1,0 +1,47 @@
+/* SSSys™ - Surplus Squad Custom Styles */
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8f9fa;
+}
+
+main {
+  flex: 1;
+}
+
+.navbar-brand small {
+  letter-spacing: .05em;
+}
+
+/* Card hover effect */
+.card {
+  transition: box-shadow .15s ease-in-out;
+}
+.card:hover {
+  box-shadow: 0 .25rem .75rem rgba(0,0,0,.1);
+}
+
+/* Status badges */
+.badge-qualified { background-color: #198754; }
+.badge-disqualified { background-color: #dc3545; }
+.badge-pending { background-color: #ffc107; color: #000; }
+
+/* Prospect type pills */
+.prospect-type-pill {
+  display: inline-block;
+  padding: .25rem .6rem;
+  border-radius: .25rem;
+  font-weight: 600;
+  font-size: .8rem;
+}
+.type-td { background-color: #0d6efd; color: #fff; }
+.type-tl { background-color: #6f42c1; color: #fff; }
+.type-ss { background-color: #fd7e14; color: #fff; }
+.type-mf { background-color: #20c997; color: #fff; }
+
+/* Table improvements */
+.table th {
+  white-space: nowrap;
+}

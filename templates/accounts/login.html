@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-md-5 col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <div class="text-center mb-4">
+          <h3 class="fw-bold mb-0">Surplus Squad</h3>
+          <small class="text-muted">SSSys<sup>TM</sup></small>
+        </div>
+
+        {% if form.errors %}
+        <div class="alert alert-danger">Invalid username or password.</div>
+        {% endif %}
+
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="id_username" class="form-label">Username</label>
+            <input type="text" name="username" id="id_username" class="form-control" autofocus required>
+          </div>
+          <div class="mb-3">
+            <label for="id_password" class="form-label">Password</label>
+            <input type="password" name="password" id="id_password" class="form-control" required>
+          </div>
+          <div class="d-grid">
+            <button type="submit" class="btn btn-primary">Sign In</button>
+          </div>
+          {% if next %}
+          <input type="hidden" name="next" value="{{ next }}">
+          {% endif %}
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

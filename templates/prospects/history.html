@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}History - {{ object.case_number }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'prospects:type_select' %}">Prospects</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'prospects:detail' object.pk %}">{{ object.case_number }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">History</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0">Action History &mdash; {{ object.case_number }}</h2>
+  <a href="{% url 'prospects:detail' object.pk %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> Back to Prospect
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-striped table-hover mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th style="width:170px;">Date / Time</th>
+            <th style="width:150px;">Action</th>
+            <th>Description</th>
+            <th style="width:150px;">User</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td>{{ log.created_at|date:"m/d/Y H:i" }}</td>
+            <td>
+              {% if log.action_type == 'created' %}
+                <span class="badge bg-primary">Created</span>
+              {% elif log.action_type == 'updated' %}
+                <span class="badge bg-info text-dark">Updated</span>
+              {% elif log.action_type == 'qualified' %}
+                <span class="badge bg-success">Qualified</span>
+              {% elif log.action_type == 'disqualified' %}
+                <span class="badge bg-danger">Disqualified</span>
+              {% elif log.action_type == 'assigned' %}
+                <span class="badge bg-primary">Assigned</span>
+              {% elif log.action_type == 'note_added' %}
+                <span class="badge bg-secondary">Note Added</span>
+              {% elif log.action_type == 'email_sent' %}
+                <span class="badge bg-info text-dark">Email Sent</span>
+              {% elif log.action_type == 'status_changed' %}
+                <span class="badge bg-warning text-dark">Status Changed</span>
+              {% elif log.action_type == 'converted_to_case' %}
+                <span class="badge bg-success">Converted</span>
+              {% else %}
+                <span class="badge bg-light text-dark">{{ log.get_action_type_display }}</span>
+              {% endif %}
+            </td>
+            <td>{{ log.description|default:"-" }}</td>
+            <td>
+              {% if log.user %}
+                {{ log.user.get_full_name|default:log.user.username }}
+              {% else %}
+                <span class="text-muted">System</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="text-center text-muted py-4">No action history recorded.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

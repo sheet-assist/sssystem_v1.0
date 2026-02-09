@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+
+{% block title %}Global Search | Surplus Squad{% endblock %}
+
+{% block content %}
+<div class="container-fluid my-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>Global Search</h1>
+            <p class="text-muted">Search prospects and cases by case number, parcel ID, address, defendant name, or county</p>
+        </div>
+    </div>
+
+    <!-- Search Form -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <form method="get" class="d-flex gap-2">
+                <input type="text" name="q" class="form-control form-control-lg" placeholder="Case number, parcel ID, address, or defendant name..." value="{{ query }}">
+                <button type="submit" class="btn btn-primary btn-lg">Search</button>
+            </form>
+        </div>
+    </div>
+
+    {% if query %}
+        <div class="alert alert-info">
+            Found <strong>{{ total_results }}</strong> result(s) for "<strong>{{ query }}</strong>"
+        </div>
+
+        <!-- Prospects Results -->
+        {% if results.prospects %}
+        <div class="row mb-5">
+            <div class="col-12">
+                <h3 class="mb-3">
+                    <i class="bi bi-person-check"></i> Prospects ({{ results.prospects_page.paginator.count }})
+                </h3>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Case Number</th>
+                                <th>County</th>
+                                <th>Defendant</th>
+                                <th>Address</th>
+                                <th>Status</th>
+                                <th>Qualification</th>
+                                <th>Assigned To</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for prospect in results.prospects %}
+                            <tr>
+                                <td><code>{{ prospect.case_number }}</code></td>
+                                <td>{{ prospect.county.name }}</td>
+                                <td>{{ prospect.defendant_name }}</td>
+                                <td>{{ prospect.address|truncatewords:3 }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ prospect.get_workflow_status_display }}</span>
+                                </td>
+                                <td>
+                                    {% if prospect.qualification_status == 'qualified' %}
+                                        <span class="badge bg-success">Qualified</span>
+                                    {% elif prospect.qualification_status == 'disqualified' %}
+                                        <span class="badge bg-danger">Disqualified</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ prospect.assigned_to|default:"Unassigned" }}</td>
+                                <td>
+                                    <a href="{% url 'prospects:detail' prospect.id %}" class="btn btn-sm btn-outline-primary">View</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Prospects Pagination -->
+                {% if results.prospects_page.has_other_pages %}
+                <nav aria-label="Prospects pagination" class="mt-3">
+                    <ul class="pagination">
+                        {% if results.prospects_page.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?q={{ query }}&page_prospects=1">First</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?q={{ query }}&page_prospects={{ results.prospects_page.previous_page_number }}">Previous</a>
+                            </li>
+                        {% endif %}
+
+                        <li class="page-item active">
+                            <span class="page-link">Page {{ results.prospects_page.number }} of {{ results.prospects_page.paginator.num_pages }}</span>
+                        </li>
+
+                        {% if results.prospects_page.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?q={{ query }}&page_prospects={{ results.prospects_page.next_page_number }}">Next</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?q={{ query }}&page_prospects={{ results.prospects_page.paginator.num_pages }}">Last</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Cases Results -->
+        {% if results.cases %}
+        <div class="row mb-5">
+            <div class="col-12">
+                <h3 class="mb-3">
+                    <i class="bi bi-folder-check"></i> Cases ({{ results.cases_page.paginator.count }})
+                </h3>
+
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Case Number</th>
+                                <th>County</th>
+                                <th>Defendant</th>
+                                <th>Address</th>
+                                <th>Status</th>
+                                <th>Prospect</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for case in results.cases %}
+                            <tr>
+                                <td><code>{{ case.case_number }}</code></td>
+                                <td>{{ case.prospect.county.name }}</td>
+                                <td>{{ case.prospect.defendant_name }}</td>
+                                <td>{{ case.address|truncatewords:3 }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ case.get_status_display }}</span>
+                                </td>
+                                <td>
+                                    <a href="{% url 'prospects:detail' case.prospect.id %}">
+                                        #{{ case.prospect.id }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <a href="{% url 'cases:detail' case.id %}" class="btn btn-sm btn-outline-primary">View</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Cases Pagination -->
+                {% if results.cases_page.has_other_pages %}
+                <nav aria-label="Cases pagination" class="mt-3">
+                    <ul class="pagination">
+                        {% if results.cases_page.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?q={{ query }}&page_cases=1">First</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?q={{ query }}&page_cases={{ results.cases_page.previous_page_number }}">Previous</a>
+                            </li>
+                        {% endif %}
+
+                        <li class="page-item active">
+                            <span class="page-link">Page {{ results.cases_page.number }} of {{ results.cases_page.paginator.num_pages }}</span>
+                        </li>
+
+                        {% if results.cases_page.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?q={{ query }}&page_cases={{ results.cases_page.next_page_number }}">Next</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?q={{ query }}&page_cases={{ results.cases_page.paginator.num_pages }}">Last</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- No Results -->
+        {% if total_results == 0 %}
+        <div class="alert alert-warning">
+            <i class="bi bi-inbox"></i> No results found for "<strong>{{ query }}</strong>". Try a different search term.
+        </div>
+        {% endif %}
+    {% else %}
+        <div class="alert alert-secondary">
+            <i class="bi bi-search"></i> Enter a search term above to get started.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

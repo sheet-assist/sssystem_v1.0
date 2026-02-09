@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Assign Prospect {{ prospect.case_number }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'prospects:type_select' %}">Prospects</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'prospects:detail' prospect.pk %}">{{ prospect.case_number }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Assign</li>
+  </ol>
+</nav>
+
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-person-plus me-1"></i> Assign Prospect
+      </div>
+      <div class="card-body">
+        <p class="text-muted mb-3">
+          Assigning <strong>{{ prospect.case_number }}</strong>
+          {% if prospect.assigned_to %}
+            (currently assigned to {{ prospect.assigned_to.get_full_name|default:prospect.assigned_to.username }})
+          {% else %}
+            (currently unassigned)
+          {% endif %}
+        </p>
+        <form method="post">
+          {% csrf_token %}
+          {% for field in form %}
+          <div class="mb-3">
+            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in field.errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+          <div class="d-flex justify-content-end gap-2">
+            <a href="{% url 'prospects:detail' prospect.pk %}" class="btn btn-outline-secondary">Cancel</a>
+            <button class="btn btn-primary" type="submit">
+              <i class="bi bi-check-lg"></i> Assign
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Workflow Transition - {{ prospect.case_number }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'prospects:type_select' %}">Prospects</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'prospects:detail' prospect.pk %}">{{ prospect.case_number }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Transition</li>
+  </ol>
+</nav>
+
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-arrow-left-right me-1"></i> Change Workflow Status
+      </div>
+      <div class="card-body">
+        <p class="text-muted mb-3">
+          Current status:
+          <span class="badge fs-6
+            {% if prospect.workflow_status == 'new' %}bg-secondary
+            {% elif prospect.workflow_status == 'assigned' %}bg-primary
+            {% elif prospect.workflow_status == 'researching' %}bg-info text-dark
+            {% elif prospect.workflow_status == 'skip_tracing' %}bg-warning text-dark
+            {% elif prospect.workflow_status == 'contacting' %}bg-warning
+            {% elif prospect.workflow_status == 'contract_sent' %}bg-success
+            {% elif prospect.workflow_status == 'converted' %}bg-success
+            {% elif prospect.workflow_status == 'dead' %}bg-danger
+            {% else %}bg-light text-dark{% endif %}">
+            {{ prospect.get_workflow_status_display }}
+          </span>
+        </p>
+        <form method="post">
+          {% csrf_token %}
+          {% for field in form %}
+          <div class="mb-3">
+            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in field.errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+          <div class="d-flex justify-content-end gap-2">
+            <a href="{% url 'prospects:detail' prospect.pk %}" class="btn btn-outline-secondary">Cancel</a>
+            <button class="btn btn-primary" type="submit">
+              <i class="bi bi-check-lg"></i> Update Status
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

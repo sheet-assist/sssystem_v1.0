@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Users{% endblock %}
+
+{% block content %}
+<h2>Users</h2>
+<div class="table-responsive mt-3">
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Active</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in profiles %}
+      <tr>
+        <td>{{ p.user.username }}</td>
+        <td>{{ p.user.get_full_name|default:"—" }}</td>
+        <td>{{ p.user.email|default:"—" }}</td>
+        <td>{{ p.get_role_display }}</td>
+        <td>
+          {% if p.user.is_active %}
+          <span class="badge bg-success">Active</span>
+          {% else %}
+          <span class="badge bg-secondary">Inactive</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="text-muted">No users found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

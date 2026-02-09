@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Filter Criteria{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center">
+  <h2>Filter Criteria</h2>
+  <a href="{% url 'settings_app:criteria_add' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg"></i> Add Rule
+  </a>
+</div>
+
+<div class="table-responsive mt-3">
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>State</th>
+        <th>County</th>
+        <th>Min Surplus</th>
+        <th>Min Date</th>
+        <th>Active</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rule in criteria %}
+      <tr>
+        <td>{{ rule.name }}</td>
+        <td><span class="prospect-type-pill type-{{ rule.prospect_type|lower }}">{{ rule.get_prospect_type_display }}</span></td>
+        <td>{{ rule.state|default:"Global" }}</td>
+        <td>{{ rule.county.name|default:"All" }}</td>
+        <td>{% if rule.min_surplus_amount %}${{ rule.min_surplus_amount|floatformat:0 }}{% else %}-{% endif %}</td>
+        <td>{{ rule.min_date|default:"-" }}</td>
+        <td>
+          {% if rule.is_active %}
+          <span class="badge bg-success">Active</span>
+          {% else %}
+          <span class="badge bg-secondary">Inactive</span>
+          {% endif %}
+        </td>
+        <td><a href="{% url 'settings_app:criteria_edit' rule.pk %}" class="btn btn-outline-secondary btn-sm">Edit</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" class="text-muted">No filter rules configured.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

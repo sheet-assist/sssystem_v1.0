@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-8 offset-md-2">
+    <h2>County Configuration: {{ object.name }}</h2>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <div class="d-flex justify-content-end">
+        <button class="btn btn-primary" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

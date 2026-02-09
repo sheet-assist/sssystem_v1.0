@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h2>Case {{ case.case_number }}</h2>
+  <p><strong>Type:</strong> {{ case.case_type }}</p>
+  <p><strong>Property:</strong> {{ case.property_address }}</p>
+  <p><strong>County:</strong> {{ case.county }}</p>
+  <p><strong>Status:</strong> {{ case.status }}</p>
+  <hr/>
+  <h4>Notes</h4>
+  <ul>
+    {% for note in case.notes.all %}
+      <li>{{ note.created_at }} - {{ note.content }} (by {{ note.author }})</li>
+    {% empty %}
+      <li>No notes yet.</li>
+    {% endfor %}
+  </ul>
+{% endblock %}

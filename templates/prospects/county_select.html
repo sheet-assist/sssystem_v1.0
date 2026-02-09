@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Select County - {{ type_display }} - {{ state_abbr }}{% endblock %}
+{% block extra_css %}
+<style>
+  .hover-card {
+    transition: background-color 0.2s ease;
+  }
+  
+  .hover-card:hover {
+    background-color: #e3f2fd;
+  }
+</style>
+
+{% endblock %}
+{% block content %}
+{# Breadcrumb #}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'prospects:type_select' %}">Prospects</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'prospects:state_select' prospect_type %}">{{ type_display }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ state_abbr }} &mdash; Select County</li>
+  </ol>
+</nav>
+
+<h2 class="mb-4">{{ type_display }} &mdash; {{ state_abbr }} Counties</h2>
+
+<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-2">
+  {% for county in counties %}
+  <div class="col">
+    <a href="{% url 'prospects:list' prospect_type state_abbr county.slug %}" class="text-decoration-none">
+      <div class="card h-100 border-secondary hover-card">
+        <div class="card-body text-center py-2 px-3">
+          <h6 class="card-title text-dark mb-0">{{ county.name }}</h6>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% empty %}
+  <div class="col-12">
+    <div class="alert alert-info">No active counties found for {{ state_abbr }}.</div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

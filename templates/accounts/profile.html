@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Profile{% endblock %}
+
+{% block content %}
+<h2>My Profile</h2>
+<div class="card mt-3" style="max-width: 600px;">
+  <div class="card-body">
+    <dl class="row mb-0">
+      <dt class="col-sm-4">Username</dt>
+      <dd class="col-sm-8">{{ user.username }}</dd>
+
+      <dt class="col-sm-4">Name</dt>
+      <dd class="col-sm-8">{{ user.get_full_name|default:"—" }}</dd>
+
+      <dt class="col-sm-4">Email</dt>
+      <dd class="col-sm-8">{{ user.email|default:"—" }}</dd>
+
+      <dt class="col-sm-4">Phone</dt>
+      <dd class="col-sm-8">{{ user.profile.phone|default:"—" }}</dd>
+
+      <dt class="col-sm-4">Role</dt>
+      <dd class="col-sm-8">{{ user.profile.get_role_display }}</dd>
+
+      <dt class="col-sm-4">Member Since</dt>
+      <dd class="col-sm-8">{{ user.date_joined|date:"M d, Y" }}</dd>
+    </dl>
+  </div>
+</div>
+{% endblock %}
