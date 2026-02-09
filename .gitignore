@@ -1,0 +1,89 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+env.bak/
+venv.bak/
+
+# Pyenv
+.python-version
+
+# pipenv / poetry
+Pipfile.lock
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage reports
+.tox/
+.nox/
+.coverage
+.coverage.*
+.pytest_cache/
+htmlcov/
+coverage.xml
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+/staticfiles/
+/media/
+
+# Environment / secrets
+.env
+.env.*
+*.env
+
+# Editor directories and files
+.vscode/
+.idea/
+*.iml
+
+# Editor backup files
+*~
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Playwright
+playwright-report/
+
+# CSV exports
+*.csv
+
+# Node
+node_modules/
+
+# Celery
+celerybeat-schedule
+
+# Mypy / Pyre
+.mypy_cache/
+.pyre/
+
+# Sphinx docs
+docs/_build/
+
+# Others
+*.pyc
