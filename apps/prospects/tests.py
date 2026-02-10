@@ -95,7 +95,7 @@ class NavigationFlowTest(ProspectTestMixin, TestCase):
         self.assertContains(resp, "2024-001234")
 
     def test_prospect_detail_page(self):
-        resp = self.client.get(f"/prospects/{self.prospect.pk}/")
+        resp = self.client.get(f"/prospects/detail/{self.prospect.pk}/")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "2024-001234")
 
@@ -121,7 +121,7 @@ class AssignmentWorkflowTest(ProspectTestMixin, TestCase):
 
     def test_assign_prospect(self):
         resp = self.client.post(
-            f"/prospects/{self.prospect.pk}/assign/",
+            f"/prospects/detail/{self.prospect.pk}/assign/",
             {"assigned_to": self.user.pk},
         )
         self.assertEqual(resp.status_code, 302)
@@ -134,7 +134,7 @@ class AssignmentWorkflowTest(ProspectTestMixin, TestCase):
 
     def test_add_note(self):
         resp = self.client.post(
-            f"/prospects/{self.prospect.pk}/notes/add/",
+            f"/prospects/detail/{self.prospect.pk}/notes/add/",
             {"content": "Important finding"},
         )
         self.assertEqual(resp.status_code, 302)
@@ -142,7 +142,7 @@ class AssignmentWorkflowTest(ProspectTestMixin, TestCase):
 
     def test_workflow_transition(self):
         resp = self.client.post(
-            f"/prospects/{self.prospect.pk}/transition/",
+            f"/prospects/detail/{self.prospect.pk}/transition/",
             {"workflow_status": "researching"},
         )
         self.assertEqual(resp.status_code, 302)
@@ -151,7 +151,7 @@ class AssignmentWorkflowTest(ProspectTestMixin, TestCase):
 
     def test_research_update(self):
         resp = self.client.post(
-            f"/prospects/{self.prospect.pk}/research/",
+            f"/prospects/detail/{self.prospect.pk}/research/",
             {"lien_check_done": True, "surplus_verified": True},
         )
         self.assertEqual(resp.status_code, 302)
@@ -161,7 +161,7 @@ class AssignmentWorkflowTest(ProspectTestMixin, TestCase):
 
     def test_history_page(self):
         log_prospect_action(self.prospect, self.admin, "created", "Test")
-        resp = self.client.get(f"/prospects/{self.prospect.pk}/history/")
+        resp = self.client.get(f"/prospects/detail/{self.prospect.pk}/history/")
         self.assertEqual(resp.status_code, 200)
 
     def test_my_prospects(self):
@@ -188,5 +188,5 @@ class AccessControlTest(ProspectTestMixin, TestCase):
         self.user.profile.save()
         c = Client()
         c.login(username="worker", password="pass")
-        resp = c.post(f"/prospects/{self.prospect.pk}/assign/", {"assigned_to": self.user.pk})
+        resp = c.post(f"/prospects/detail/{self.prospect.pk}/assign/", {"assigned_to": self.user.pk})
         self.assertEqual(resp.status_code, 403)

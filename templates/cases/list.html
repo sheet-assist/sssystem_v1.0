@@ -1,6 +1,80 @@
 {% extends "base.html" %}
-{% block title %}Coming Soon{% endblock %}
+{% block title %}Cases{% endblock %}
 {% block content %}
-<h2>Coming Soon</h2>
-<p class="text-muted">This section is under construction.</p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2>Cases</h2>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label mb-0">Type</label>
+        <select name="case_type" class="form-select form-select-sm">
+          <option value="">All Types</option>
+          {% for code, label in case_types %}
+            <option value="{{ code }}" {% if current_type == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label mb-0">Status</label>
+        <select name="status" class="form-select form-select-sm">
+          <option value="">All Statuses</option>
+          {% for code, label in statuses %}
+            <option value="{{ code }}" {% if current_status == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+        <a href="{% url 'cases:list' %}" class="btn btn-sm btn-outline-secondary">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-hover table-sm">
+    <thead class="table-dark">
+      <tr>
+        <th>ID</th>
+        <th>Type</th>
+        <th>Case #</th>
+        <th>County</th>
+        <th>State</th>
+        <th>Status</th>
+        <th>Assigned To</th>
+        <th>Contract Date</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for case in object_list %}
+      <tr>
+        <td><a href="{% url 'cases:detail' case.pk %}">{{ case.pk }}</a></td>
+        <td><span class="badge bg-secondary">{{ case.get_case_type_display }}</span></td>
+        <td>{{ case.case_number|default:"-" }}</td>
+        <td>{{ case.county.name }}</td>
+        <td>{{ case.county.state.abbreviation }}</td>
+        <td>
+          {% if case.status == "active" %}<span class="badge bg-success">Active</span>
+          {% elif case.status == "monitoring" %}<span class="badge bg-info">Monitoring</span>
+          {% elif case.status == "follow_up" %}<span class="badge bg-warning text-dark">Follow Up</span>
+          {% elif case.status == "closed_won" %}<span class="badge bg-primary">Closed Won</span>
+          {% elif case.status == "closed_lost" %}<span class="badge bg-danger">Closed Lost</span>
+          {% endif %}
+        </td>
+        <td>{{ case.assigned_to.username|default:"-" }}</td>
+        <td>{{ case.contract_date|default:"-" }}</td>
+        <td>{{ case.created_at|date:"M d, Y" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="9" class="text-center text-muted">No cases found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% include "includes/pagination.html" %}
 {% endblock %}

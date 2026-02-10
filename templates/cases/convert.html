@@ -1,11 +1,46 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% block title %}Convert Prospect to Case{% endblock %}
 {% block content %}
-  <h2>Convert Prospect to Case</h2>
-  <p>Prospect: {{ prospect }}</p>
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button class="btn btn-primary" type="submit">Convert</button>
-    <a href="{{ prospect.get_absolute_url|default:'#' }}" class="btn btn-secondary">Cancel</a>
-  </form>
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <h2>Convert Prospect to Case</h2>
+
+    <div class="card mb-3">
+      <div class="card-header"><strong>Source Prospect</strong></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-4">Case Number</dt>
+          <dd class="col-sm-8">{{ prospect.case_number }}</dd>
+          <dt class="col-sm-4">Type</dt>
+          <dd class="col-sm-8">{{ prospect.get_prospect_type_display }}</dd>
+          <dt class="col-sm-4">County</dt>
+          <dd class="col-sm-8">{{ prospect.county.name }}</dd>
+          <dt class="col-sm-4">Property Address</dt>
+          <dd class="col-sm-8">{{ prospect.property_address|default:"-" }}</dd>
+          <dt class="col-sm-4">Surplus Amount</dt>
+          <dd class="col-sm-8">${{ prospect.surplus_amount|default:"-" }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><strong>Contract Details</strong></div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="id_contract_date" class="form-label">Contract Date</label>
+            {{ form.contract_date }}
+          </div>
+          <div class="mb-3">
+            <label for="id_contract_notes" class="form-label">Contract Notes</label>
+            {{ form.contract_notes }}
+          </div>
+          <button type="submit" class="btn btn-primary">Convert to Case</button>
+          <a href="{% url 'prospects:detail' prospect.pk %}" class="btn btn-secondary">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

@@ -1,17 +1,119 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% block title %}Case {{ object.case_number|default:object.pk }}{% endblock %}
 {% block content %}
-  <h2>Case {{ case.case_number }}</h2>
-  <p><strong>Type:</strong> {{ case.case_type }}</p>
-  <p><strong>Property:</strong> {{ case.property_address }}</p>
-  <p><strong>County:</strong> {{ case.county }}</p>
-  <p><strong>Status:</strong> {{ case.status }}</p>
-  <hr/>
-  <h4>Notes</h4>
-  <ul>
-    {% for note in case.notes.all %}
-      <li>{{ note.created_at }} - {{ note.content }} (by {{ note.author }})</li>
-    {% empty %}
-      <li>No notes yet.</li>
-    {% endfor %}
-  </ul>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2>Case {{ object.case_number|default:object.pk }}
+    <span class="badge bg-secondary">{{ object.get_case_type_display }}</span>
+    {% if object.status == "active" %}<span class="badge bg-success">Active</span>
+    {% elif object.status == "monitoring" %}<span class="badge bg-info">Monitoring</span>
+    {% elif object.status == "follow_up" %}<span class="badge bg-warning text-dark">Follow Up</span>
+    {% elif object.status == "closed_won" %}<span class="badge bg-primary">Closed Won</span>
+    {% elif object.status == "closed_lost" %}<span class="badge bg-danger">Closed Lost</span>
+    {% endif %}
+  </h2>
+  <div>
+    <a href="{% url 'cases:status_update' object.pk %}" class="btn btn-sm btn-outline-primary">Change Status</a>
+    <a href="{% url 'cases:history' object.pk %}" class="btn btn-sm btn-outline-secondary">History</a>
+    <a href="{% url 'cases:list' %}" class="btn btn-sm btn-outline-secondary">Back to List</a>
+  </div>
+</div>
+
+<div class="row">
+  <!-- Case Info -->
+  <div class="col-md-6">
+    <div class="card mb-3">
+      <div class="card-header"><strong>Case Information</strong></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-5">Property Address</dt>
+          <dd class="col-sm-7">{{ object.property_address|default:"-" }}</dd>
+          <dt class="col-sm-5">Case Number</dt>
+          <dd class="col-sm-7">{{ object.case_number|default:"-" }}</dd>
+          <dt class="col-sm-5">Parcel ID</dt>
+          <dd class="col-sm-7">{{ object.parcel_id|default:"-" }}</dd>
+          <dt class="col-sm-5">County</dt>
+          <dd class="col-sm-7">{{ object.county.name }}, {{ object.county.state.abbreviation }}</dd>
+          <dt class="col-sm-5">Assigned To</dt>
+          <dd class="col-sm-7">{{ object.assigned_to.username|default:"Unassigned" }}</dd>
+          <dt class="col-sm-5">Contract Date</dt>
+          <dd class="col-sm-7">{{ object.contract_date|default:"-" }}</dd>
+          <dt class="col-sm-5">Created</dt>
+          <dd class="col-sm-7">{{ object.created_at|date:"M d, Y H:i" }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    {% if object.contract_notes %}
+    <div class="card mb-3">
+      <div class="card-header"><strong>Contract Notes</strong></div>
+      <div class="card-body">{{ object.contract_notes }}</div>
+    </div>
+    {% endif %}
+
+    {% if object.prospect %}
+    <div class="card mb-3">
+      <div class="card-header"><strong>Source Prospect</strong></div>
+      <div class="card-body">
+        <a href="{% url 'prospects:detail' object.prospect.pk %}">
+          {{ object.prospect }}
+        </a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Notes & Follow-ups -->
+  <div class="col-md-6">
+    <!-- Notes -->
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Notes</strong>
+        <a href="{% url 'cases:note_add' object.pk %}" class="btn btn-sm btn-primary">Add Note</a>
+      </div>
+      <div class="card-body">
+        {% for note in object.notes.all %}
+        <div class="mb-2 pb-2 {% if not forloop.last %}border-bottom{% endif %}">
+          <small class="text-muted">{{ note.created_at|date:"M d, Y H:i" }} by {{ note.author|default:"System" }}</small>
+          <p class="mb-0">{{ note.content }}</p>
+        </div>
+        {% empty %}
+        <p class="text-muted mb-0">No notes yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Follow-ups -->
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Follow-ups</strong>
+        <a href="{% url 'cases:followup_add' object.pk %}" class="btn btn-sm btn-primary">Add Follow-up</a>
+      </div>
+      <div class="card-body">
+        {% for fu in object.followups.all %}
+        <div class="mb-2 pb-2 {% if not forloop.last %}border-bottom{% endif %}">
+          <div class="d-flex justify-content-between">
+            <div>
+              {% if fu.is_completed %}
+                <span class="badge bg-success">Completed</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Due {{ fu.due_date }}</span>
+              {% endif %}
+              {% if fu.assigned_to %}<small class="text-muted ms-1">{{ fu.assigned_to.username }}</small>{% endif %}
+            </div>
+            {% if not fu.is_completed %}
+            <form method="post" action="{% url 'cases:followup_complete' object.pk fu.pk %}" class="d-inline">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-success">Complete</button>
+            </form>
+            {% endif %}
+          </div>
+          <p class="mb-0 mt-1">{{ fu.description }}</p>
+        </div>
+        {% empty %}
+        <p class="text-muted mb-0">No follow-ups yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

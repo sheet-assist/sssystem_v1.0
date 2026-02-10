@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Add Follow-up - Case {{ case.case_number|default:case.pk }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <h2>Add Follow-up to Case {{ case.case_number|default:case.pk }}</h2>
+    <div class="card">
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="id_due_date" class="form-label">Due Date</label>
+            {{ form.due_date }}
+          </div>
+          <div class="mb-3">
+            <label for="id_description" class="form-label">Description</label>
+            {{ form.description }}
+          </div>
+          <div class="mb-3">
+            <label for="id_assigned_to" class="form-label">Assign To</label>
+            {{ form.assigned_to }}
+          </div>
+          <button type="submit" class="btn btn-primary">Create Follow-up</button>
+          <a href="{% url 'cases:detail' case.pk %}" class="btn btn-secondary">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
