@@ -5,13 +5,14 @@ from datetime import timedelta, date
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
-from django.views.generic import CreateView, DetailView, ListView, TemplateView, View
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView, View
 from django.utils import timezone
 from django.db.models import Q, Count
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
 from apps.accounts.mixins import AdminRequiredMixin
+from apps.locations.models import State
 
 from .engine import run_scrape_job
 from .forms import ScrapeJobForm, JobCreationForm, JobFilterForm
@@ -654,3 +655,99 @@ class JobRetryAPIView(AdminRequiredMixin, View):
                 'success': False,
                 'error': 'Job not found',
             }, status=404)
+
+# ============================================================================
+# COUNTY SCRAPE URL MANAGEMENT VIEWS
+# ============================================================================
+
+class CountyScrapeURLListView(AdminRequiredMixin, ListView):
+    """List all county scrape URLs with search"""
+    from .models import CountyScrapeURL
+    model = CountyScrapeURL
+    template_name = "scraper/countyscrapeurl_list.html"
+    context_object_name = "scrape_urls"
+    paginate_by = 20
+
+    def get_queryset(self):
+        qs = self.model.objects.select_related('county', 'state', 'updated_by').order_by('-updated_at')
+        
+        # Search by county name
+        county_search = self.request.GET.get('county', '').strip()
+        if county_search:
+            qs = qs.filter(county__name__icontains=county_search)
+        
+        # Search by state
+        state_search = self.request.GET.get('state', '').strip()
+        if state_search:
+            qs = qs.filter(state__name__icontains=state_search) | qs.filter(state__abbreviation__icontains=state_search)
+        
+        # Filter by URL type
+        url_type = self.request.GET.get('url_type', '').strip()
+        if url_type:
+            qs = qs.filter(url_type=url_type)
+        
+        # Filter by active status
+        is_active = self.request.GET.get('is_active', '').strip()
+        if is_active:
+            qs = qs.filter(is_active=is_active.lower() == 'true')
+        
+        return qs
+    
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['county_search'] = self.request.GET.get('county', '')
+        ctx['state_search'] = self.request.GET.get('state', '')
+        ctx['url_type_filter'] = self.request.GET.get('url_type', '')
+        ctx['is_active_filter'] = self.request.GET.get('is_active', '')
+        
+        # Get unique states and URL types for filter dropdowns
+        from .models import CountyScrapeURL
+        ctx['states'] = State.objects.filter(is_active=True).order_by('name')
+        ctx['url_types'] = CountyScrapeURL.URL_TYPE_CHOICES
+        
+        return ctx
+
+
+class CountyScrapeURLCreateView(AdminRequiredMixin, CreateView):
+    """Create a new county scrape URL"""
+    from .models import CountyScrapeURL
+    from .forms import CountyScrapeURLForm
+    model = CountyScrapeURL
+    form_class = CountyScrapeURLForm
+    template_name = "scraper/countyscrapeurl_form.html"
+    success_url = reverse_lazy("scraper:countyscrapeurl_list")
+
+    def form_valid(self, form):
+        form.instance.updated_by = self.request.user
+        messages.success(self.request, "County scrape URL created successfully.")
+        return super().form_valid(form)
+
+
+class CountyScrapeURLUpdateView(AdminRequiredMixin, UpdateView):
+    """Update an existing county scrape URL"""
+    from .models import CountyScrapeURL
+    from .forms import CountyScrapeURLForm
+    from django.views.generic import UpdateView
+    model = CountyScrapeURL
+    form_class = CountyScrapeURLForm
+    template_name = "scraper/countyscrapeurl_form.html"
+    pk_url_kwarg = 'pk'
+    success_url = reverse_lazy("scraper:countyscrapeurl_list")
+
+    def form_valid(self, form):
+        form.instance.updated_by = self.request.user
+        messages.success(self.request, "County scrape URL updated successfully.")
+        return super().form_valid(form)
+
+
+class CountyScrapeURLDeleteView(AdminRequiredMixin, DeleteView):
+    """Delete a county scrape URL"""
+    from .models import CountyScrapeURL
+    from django.views.generic import DeleteView
+    model = CountyScrapeURL
+    success_url = reverse_lazy("scraper:countyscrapeurl_list")
+    pk_url_kwarg = 'pk'
+
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, "County scrape URL deleted successfully.")
+        return super().delete(request, *args, **kwargs)

@@ -298,3 +298,197 @@ class ScrapeJobForm(forms.ModelForm):
         if start and end and end < start:
             raise forms.ValidationError("End date must be on or after the start date.")
         return cleaned
+
+# ============================================================================
+# PROSPECT FILTER FORM: Financial Criteria Filtering
+# ============================================================================
+
+class ProspectFilterForm(forms.Form):
+    """Form for filtering prospects by financial criteria"""
+    
+    plaintiff_max_bid_min = forms.DecimalField(
+        required=False,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "placeholder": "Min Plaintiff Max Bid",
+            "step": "1000",
+        }),
+        label="Min Plaintiff Max Bid"
+    )
+    
+    plaintiff_max_bid_max = forms.DecimalField(
+        required=False,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "placeholder": "Max Plaintiff Max Bid",
+            "step": "1000",
+        }),
+        label="Max Plaintiff Max Bid"
+    )
+    
+    assessed_value_min = forms.DecimalField(
+        required=False,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "placeholder": "Min Assessed Value",
+            "step": "1000",
+        }),
+        label="Min Assessed Value"
+    )
+    
+    assessed_value_max = forms.DecimalField(
+        required=False,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "placeholder": "Max Assessed Value",
+            "step": "1000",
+        }),
+        label="Max Assessed Value"
+    )
+    
+    final_judgment_min = forms.DecimalField(
+        required=False,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "placeholder": "Min Final Judgment",
+            "step": "1000",
+        }),
+        label="Min Final Judgment Amount"
+    )
+    
+    final_judgment_max = forms.DecimalField(
+        required=False,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "placeholder": "Max Final Judgment",
+            "step": "1000",
+        }),
+        label="Max Final Judgment Amount"
+    )
+    
+    sale_amount_min = forms.DecimalField(
+        required=False,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "placeholder": "Min Sale Amount",
+            "step": "1000",
+        }),
+        label="Min Sale Amount"
+    )
+    
+    sale_amount_max = forms.DecimalField(
+        required=False,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "placeholder": "Max Sale Amount",
+            "step": "1000",
+        }),
+        label="Max Sale Amount"
+    )
+    
+    def clean(self):
+        cleaned = super().clean()
+        
+        # Validate plaintiff_max_bid range
+        plaintiff_min = cleaned.get('plaintiff_max_bid_min')
+        plaintiff_max = cleaned.get('plaintiff_max_bid_max')
+        if plaintiff_min and plaintiff_max and plaintiff_max < plaintiff_min:
+            raise forms.ValidationError("Plaintiff Max Bid: Max value must be >= Min value.")
+        
+        # Validate assessed_value range
+        assessed_min = cleaned.get('assessed_value_min')
+        assessed_max = cleaned.get('assessed_value_max')
+        if assessed_min and assessed_max and assessed_max < assessed_min:
+            raise forms.ValidationError("Assessed Value: Max value must be >= Min value.")
+        
+        # Validate final_judgment range
+        judgment_min = cleaned.get('final_judgment_min')
+        judgment_max = cleaned.get('final_judgment_max')
+        if judgment_min and judgment_max and judgment_max < judgment_min:
+            raise forms.ValidationError("Final Judgment: Max value must be >= Min value.")
+        
+        # Validate sale_amount range
+        sale_min = cleaned.get('sale_amount_min')
+        sale_max = cleaned.get('sale_amount_max')
+        if sale_min and sale_max and sale_max < sale_min:
+            raise forms.ValidationError("Sale Amount: Max value must be >= Min value.")
+        
+        return cleaned
+
+
+# ============================================================================
+# COUNTY SCRAPE URL MANAGEMENT FORMS
+# ============================================================================
+
+class CountyScrapeURLForm(forms.ModelForm):
+    """Form for creating and editing CountyScrapeURL records"""
+
+    state = forms.ModelChoiceField(
+        queryset=State.objects.filter(is_active=True),
+        widget=forms.Select(attrs={
+            "class": "form-select",
+            "id": "id_state",
+        }),
+        label="State"
+    )
+
+    county = forms.ModelChoiceField(
+        queryset=County.objects.filter(is_active=True),
+        widget=forms.Select(attrs={
+            "class": "form-select",
+            "id": "id_county",
+        }),
+        label="County"
+    )
+
+    base_url = forms.URLField(
+        widget=forms.URLInput(attrs={
+            "class": "form-control",
+            "placeholder": "https://example.com/...",
+        }),
+        label="Base URL"
+    )
+
+    is_active = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={
+            "class": "form-check-input",
+        }),
+        label="Active"
+    )
+
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            "class": "form-control",
+            "rows": 3,
+            "placeholder": "Optional notes about this URL",
+        }),
+        label="Notes"
+    )
+
+    class Meta:
+        from .models import CountyScrapeURL
+        model = CountyScrapeURL
+        fields = ['state', 'county', 'url_type', 'base_url', 'is_active', 'notes']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Pre-populate county queryset based on state if editing
+        if self.instance and self.instance.pk and self.instance.state:
+            self.fields['county'].queryset = County.objects.filter(
+                state=self.instance.state,
+                is_active=True
+            )
+        
+        self.fields['is_active'].initial = True
+

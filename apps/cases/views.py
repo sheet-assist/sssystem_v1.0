@@ -4,8 +4,10 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.views.generic import CreateView, DetailView, FormView, ListView
+from django.db.models import Q
 
 from apps.accounts.mixins import CasesAccessMixin
+from apps.locations.models import State
 from apps.prospects.models import Prospect, log_prospect_action
 
 from .forms import CaseFollowUpForm, CaseNoteForm, CaseStatusForm, ConvertToCaseForm
@@ -21,15 +23,30 @@ class CaseListView(CasesAccessMixin, ListView):
 
     def get_queryset(self):
         qs = Case.objects.select_related("county", "county__state", "assigned_to", "prospect")
+        
         case_type = self.request.GET.get("case_type")
         status = self.request.GET.get("status")
-        county = self.request.GET.get("county")
+        county = self.request.GET.get("county", "").strip()
+        state = self.request.GET.get("state", "").strip()
+        case_number = self.request.GET.get("case_number", "").strip()
+        
         if case_type:
             qs = qs.filter(case_type=case_type)
         if status:
             qs = qs.filter(status=status)
+        
+        # Search by case number
+        if case_number:
+            qs = qs.filter(case_number__icontains=case_number)
+        
+        # Search by county name
         if county:
-            qs = qs.filter(county__slug=county)
+            qs = qs.filter(county__name__icontains=county)
+        
+        # Search by state name or abbreviation
+        if state:
+            qs = qs.filter(Q(county__state__name__icontains=state) | Q(county__state__abbreviation__icontains=state))
+        
         return qs
 
     def get_context_data(self, **kwargs):
@@ -38,6 +55,10 @@ class CaseListView(CasesAccessMixin, ListView):
         ctx["statuses"] = Case.CASE_STATUS
         ctx["current_type"] = self.request.GET.get("case_type", "")
         ctx["current_status"] = self.request.GET.get("status", "")
+        ctx["case_number_search"] = self.request.GET.get("case_number", "")
+        ctx["county_search"] = self.request.GET.get("county", "")
+        ctx["state_search"] = self.request.GET.get("state", "")
+        ctx["states"] = State.objects.filter(is_active=True).order_by("name")
         return ctx
 
 

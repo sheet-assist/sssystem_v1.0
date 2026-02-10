@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}
+  {% if object %}
+    Edit County Scrape URL
+  {% else %}
+    Add County Scrape URL
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <h3>
+        {% if object %}
+          Edit Scrape URL
+        {% else %}
+          Add County Scrape URL
+        {% endif %}
+      </h3>
+
+      <form method="post" class="mt-4">
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+          {% for error in form.non_field_errors %}
+          <p>{{ error }}</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="mb-3">
+          <label for="{{ form.state.id_for_label }}" class="form-label">{{ form.state.label }}</label>
+          {{ form.state }}
+          {% if form.state.errors %}
+          <div class="text-danger small">{{ form.state.errors.0 }}</div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label for="{{ form.county.id_for_label }}" class="form-label">{{ form.county.label }}</label>
+          {{ form.county }}
+          {% if form.county.errors %}
+          <div class="text-danger small">{{ form.county.errors.0 }}</div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label for="{{ form.url_type.id_for_label }}" class="form-label">{{ form.url_type.label }}</label>
+          {{ form.url_type }}
+          {% if form.url_type.errors %}
+          <div class="text-danger small">{{ form.url_type.errors.0 }}</div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label for="{{ form.base_url.id_for_label }}" class="form-label">{{ form.base_url.label }}</label>
+          {{ form.base_url }}
+          {% if form.base_url.errors %}
+          <div class="text-danger small">{{ form.base_url.errors.0 }}</div>
+          {% endif %}
+          <small class="form-text text-muted">Enter the complete URL for this county</small>
+        </div>
+
+        <div class="mb-3">
+          <div class="form-check">
+            {{ form.is_active }}
+            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+              {{ form.is_active.label }}
+            </label>
+            {% if form.is_active.errors %}
+            <div class="text-danger small">{{ form.is_active.errors.0 }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label }}</label>
+          {{ form.notes }}
+          {% if form.notes.errors %}
+          <div class="text-danger small">{{ form.notes.errors.0 }}</div>
+          {% endif %}
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary">
+            {% if object %}Save Changes{% else %}Add URL{% endif %}
+          </button>
+          <a href="{% url 'scraper:countyscrapeurl_list' %}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -44,4 +44,13 @@ urlpatterns = [
     path("jobs/create/", views.ScrapeJobCreateView.as_view(), name="job_create"),
     path("jobs/<int:pk>/", views.ScrapeJobDetailView.as_view(), name="job_detail"),
     path("jobs/<int:pk>/run/", views.ScrapeJobRunView.as_view(), name="job_run"),
+
+    # ====================================================================
+    # COUNTY SCRAPE URL MANAGEMENT
+    # ====================================================================
+    
+    path("county-urls/", views.CountyScrapeURLListView.as_view(), name="countyscrapeurl_list"),
+    path("county-urls/add/", views.CountyScrapeURLCreateView.as_view(), name="countyscrapeurl_add"),
+    path("county-urls/<int:pk>/edit/", views.CountyScrapeURLUpdateView.as_view(), name="countyscrapeurl_edit"),
+    path("county-urls/<int:pk>/delete/", views.CountyScrapeURLDeleteView.as_view(), name="countyscrapeurl_delete"),
 ]

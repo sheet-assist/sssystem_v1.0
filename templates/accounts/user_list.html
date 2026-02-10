@@ -3,37 +3,106 @@
 {% block title %}Users{% endblock %}
 
 {% block content %}
-<h2>Users</h2>
-<div class="table-responsive mt-3">
-  <table class="table table-striped">
-    <thead>
-      <tr>
-        <th>Username</th>
-        <th>Name</th>
-        <th>Email</th>
-        <th>Role</th>
-        <th>Active</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for p in profiles %}
-      <tr>
-        <td>{{ p.user.username }}</td>
-        <td>{{ p.user.get_full_name|default:"—" }}</td>
-        <td>{{ p.user.email|default:"—" }}</td>
-        <td>{{ p.get_role_display }}</td>
-        <td>
-          {% if p.user.is_active %}
-          <span class="badge bg-success">Active</span>
-          {% else %}
-          <span class="badge bg-secondary">Inactive</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="5" class="text-muted">No users found.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h3>Users</h3>
+  </div>
+
+  {% if profiles_by_role %}
+    {% for role_name, role_profiles in profiles_by_role.items %}
+    <div class="mb-4">
+      <h5 class="mb-2" style="color: #333; font-weight: 600;">{{ role_name }}</h5>
+      <div class="row g-1">
+        {% for profile in role_profiles %}
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100">
+            <!-- Card Header -->
+            <div class="card-header bg-light border-bottom p-1" style="padding: 0.4rem !important;">
+              <div class="d-flex justify-content-between align-items-start gap-1">
+                <div style="flex: 1; min-width: 0;">
+                  <h6 class="card-title mb-0" style="font-size: 0.85rem; word-break: break-word;">
+                    {{ profile.user.get_full_name|default:profile.user.username }}
+                  </h6>
+                  <small class="text-muted">@{{ profile.user.username }}</small>
+                </div>
+                <div style="white-space: nowrap;">
+                  {% if profile.user.is_active %}
+                  <span class="badge bg-success" style="font-size: 0.6rem;">Active</span>
+                  {% else %}
+                  <span class="badge bg-secondary" style="font-size: 0.6rem;">Inactive</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <!-- Card Body -->
+            <div class="card-body p-1" style="padding: 0.5rem !important;">
+              <div class="mb-1" style="margin-bottom: 0.25rem !important;">
+                <small class="text-muted d-block" style="font-size: 0.65rem; font-weight: 600;">Role</small>
+                <small style="font-size: 0.7rem;">
+                  <span class="badge bg-info">{{ profile.get_role_display }}</span>
+                </small>
+              </div>
+
+              <div class="mb-1" style="margin-bottom: 0.25rem !important;">
+                <small class="text-muted d-block" style="font-size: 0.65rem; font-weight: 600;">Email</small>
+                <small style="font-size: 0.7rem;">{{ profile.user.email|default:"—" }}</small>
+              </div>
+
+              <div class="mb-1" style="margin-bottom: 0.25rem !important;">
+                <small class="text-muted d-block" style="font-size: 0.65rem; font-weight: 600;">Phone</small>
+                <small style="font-size: 0.7rem;">{{ profile.phone|default:"—" }}</small>
+              </div>
+
+              <div>
+                <small class="text-muted d-block" style="font-size: 0.65rem; font-weight: 600;">Joined</small>
+                <small style="font-size: 0.7rem;">{{ profile.created_at|date:"M d, Y" }}</small>
+              </div>
+            </div>
+
+            <!-- Card Footer -->
+            <div class="card-footer bg-light p-1" style="padding: 0.3rem !important;">
+              <a href="{% url 'accounts:user_edit' profile.pk %}" class="btn btn-outline-primary btn-sm w-100" style="font-size: 0.65rem; padding: 0.2rem 0.25rem;">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle"></i>
+    No users found.
+  </div>
+  {% endif %}
 </div>
+
+<style>
+  .card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    font-size: 0.75rem;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .card .small {
+    font-size: 0.7rem;
+    line-height: 1.2;
+  }
+
+  .card-title {
+    line-height: 1.2;
+  }
+
+  .badge {
+    line-height: 1;
+  }
+</style>
 {% endblock %}
+

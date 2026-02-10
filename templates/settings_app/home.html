@@ -26,6 +26,15 @@
   <div class="col-md-4">
     <div class="card">
       <div class="card-body">
+        <h5 class="card-title">Scrape URLs</h5>
+        <p class="text-muted">Manage county scraping URLs</p>
+        <a href="{% url 'scraper:countyscrapeurl_list' %}" class="btn btn-outline-secondary btn-sm">Manage URLs</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body">
         <h5 class="card-title">Users</h5>
         <p class="text-muted">Manage user accounts and roles</p>
         <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm">User List</a>

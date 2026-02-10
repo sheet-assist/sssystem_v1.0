@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.urls import reverse_lazy
-from django.views.generic import CreateView, ListView, TemplateView, UpdateView
+from django.views.generic import CreateView, DeleteView, ListView, TemplateView, UpdateView
 
 from apps.accounts.mixins import AdminRequiredMixin
 
@@ -21,6 +21,7 @@ class CriteriaListView(AdminRequiredMixin, ListView):
     model = FilterCriteria
     template_name = "settings_app/criteria_list.html"
     context_object_name = "criteria"
+    paginate_by = 20
 
 
 class CriteriaCreateView(AdminRequiredMixin, CreateView):
@@ -30,7 +31,7 @@ class CriteriaCreateView(AdminRequiredMixin, CreateView):
     success_url = reverse_lazy("settings_app:criteria_list")
 
     def form_valid(self, form):
-        messages.success(self.request, "Filter rule created.")
+        messages.success(self.request, "Filter rule created successfully.")
         return super().form_valid(form)
 
 
@@ -41,5 +42,14 @@ class CriteriaUpdateView(AdminRequiredMixin, UpdateView):
     success_url = reverse_lazy("settings_app:criteria_list")
 
     def form_valid(self, form):
-        messages.success(self.request, "Filter rule updated.")
+        messages.success(self.request, "Filter rule updated successfully.")
         return super().form_valid(form)
+
+
+class CriteriaDeleteView(AdminRequiredMixin, DeleteView):
+    model = FilterCriteria
+    success_url = reverse_lazy("settings_app:criteria_list")
+    
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, "Filter rule deleted successfully.")
+        return super().delete(request, *args, **kwargs)

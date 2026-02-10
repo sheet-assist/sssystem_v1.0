@@ -1,16 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Cases{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h2>Cases</h2>
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h3>Cases</h3>
 </div>
 
-<div class="card mb-3">
-  <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
+<div class="card mb-2">
+  <div class="card-body p-2">
+    <form method="get" class="row g-1 align-items-end">
       <div class="col-auto">
-        <label class="form-label mb-0">Type</label>
-        <select name="case_type" class="form-select form-select-sm">
+        <label class="form-label mb-0" style="font-size: 0.85rem;">Case #</label>
+        <input type="text" name="case_number" class="form-control form-control-sm" placeholder="Search case #..." value="{{ case_number_search }}" style="font-size: 0.85rem; width: 120px;">
+      </div>
+      <div class="col-auto">
+        <label class="form-label mb-0" style="font-size: 0.85rem;">Type</label>
+        <select name="case_type" class="form-select form-select-sm" style="font-size: 0.85rem;">
           <option value="">All Types</option>
           {% for code, label in case_types %}
             <option value="{{ code }}" {% if current_type == code %}selected{% endif %}>{{ label }}</option>
@@ -18,8 +22,8 @@
         </select>
       </div>
       <div class="col-auto">
-        <label class="form-label mb-0">Status</label>
-        <select name="status" class="form-select form-select-sm">
+        <label class="form-label mb-0" style="font-size: 0.85rem;">Status</label>
+        <select name="status" class="form-select form-select-sm" style="font-size: 0.85rem;">
           <option value="">All Statuses</option>
           {% for code, label in statuses %}
             <option value="{{ code }}" {% if current_status == code %}selected{% endif %}>{{ label }}</option>
@@ -27,54 +31,110 @@
         </select>
       </div>
       <div class="col-auto">
-        <button type="submit" class="btn btn-sm btn-primary">Filter</button>
-        <a href="{% url 'cases:list' %}" class="btn btn-sm btn-outline-secondary">Clear</a>
+        <label class="form-label mb-0" style="font-size: 0.85rem;">County</label>
+        <input type="text" name="county" class="form-control form-control-sm" placeholder="Search county..." value="{{ county_search }}" style="font-size: 0.85rem; width: 150px;">
+      </div>
+      <div class="col-auto">
+        <label class="form-label mb-0" style="font-size: 0.85rem;">State</label>
+        <input type="text" name="state" class="form-control form-control-sm" placeholder="State name..." value="{{ state_search }}" style="font-size: 0.85rem; width: 120px;">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-primary" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">Filter</button>
+        <a href="{% url 'cases:list' %}" class="btn btn-sm btn-outline-secondary" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">Clear</a>
       </div>
     </form>
   </div>
 </div>
 
-<div class="table-responsive">
-  <table class="table table-hover table-sm">
-    <thead class="table-dark">
-      <tr>
-        <th>ID</th>
-        <th>Type</th>
-        <th>Case #</th>
-        <th>County</th>
-        <th>State</th>
-        <th>Status</th>
-        <th>Assigned To</th>
-        <th>Contract Date</th>
-        <th>Created</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for case in object_list %}
-      <tr>
-        <td><a href="{% url 'cases:detail' case.pk %}">{{ case.pk }}</a></td>
-        <td><span class="badge bg-secondary">{{ case.get_case_type_display }}</span></td>
-        <td>{{ case.case_number|default:"-" }}</td>
-        <td>{{ case.county.name }}</td>
-        <td>{{ case.county.state.abbreviation }}</td>
-        <td>
-          {% if case.status == "active" %}<span class="badge bg-success">Active</span>
-          {% elif case.status == "monitoring" %}<span class="badge bg-info">Monitoring</span>
-          {% elif case.status == "follow_up" %}<span class="badge bg-warning text-dark">Follow Up</span>
-          {% elif case.status == "closed_won" %}<span class="badge bg-primary">Closed Won</span>
-          {% elif case.status == "closed_lost" %}<span class="badge bg-danger">Closed Lost</span>
-          {% endif %}
-        </td>
-        <td>{{ case.assigned_to.username|default:"-" }}</td>
-        <td>{{ case.contract_date|default:"-" }}</td>
-        <td>{{ case.created_at|date:"M d, Y" }}</td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="9" class="text-center text-muted">No cases found.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="row g-1">
+  {% for case in object_list %}
+  <div class="col-md-6 col-lg-3">
+    <div class="card h-100">
+      <!-- Card Header -->
+      <div class="card-header bg-light border-bottom p-1" style="padding: 0.4rem !important;">
+        <div class="d-flex justify-content-between align-items-start gap-1">
+          <div style="flex: 1; min-width: 0;">
+            <h6 class="card-title mb-0" style="font-size: 0.85rem;">
+              <a href="{% url 'cases:detail' case.pk %}" style="text-decoration: none; color: inherit; word-break: break-word;">Case #{{ case.case_number|default:case.pk }}</a>
+            </h6>
+            <span class="badge bg-secondary" style="font-size: 0.6rem;">{{ case.get_case_type_display }}</span>
+          </div>
+          <div style="white-space: nowrap;">
+            {% if case.status == "active" %}<span class="badge bg-success" style="font-size: 0.6rem;">Active</span>
+            {% elif case.status == "monitoring" %}<span class="badge bg-info" style="font-size: 0.6rem;">Monitoring</span>
+            {% elif case.status == "follow_up" %}<span class="badge bg-warning text-dark" style="font-size: 0.6rem;">Follow Up</span>
+            {% elif case.status == "closed_won" %}<span class="badge bg-primary" style="font-size: 0.6rem;">Closed Won</span>
+            {% elif case.status == "closed_lost" %}<span class="badge bg-danger" style="font-size: 0.6rem;">Closed Lost</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Card Body -->
+      <div class="card-body p-1" style="padding: 0.5rem !important;">
+        <div class="mb-1" style="margin-bottom: 0.25rem !important;">
+          <small class="text-muted d-block" style="font-size: 0.65rem; font-weight: 600;">Location</small>
+          <small style="font-size: 0.7rem;">{{ case.county.name }}, {{ case.county.state.abbreviation }}</small>
+        </div>
+
+        <div class="mb-1" style="margin-bottom: 0.25rem !important;">
+          <small class="text-muted d-block" style="font-size: 0.65rem; font-weight: 600;">Assigned</small>
+          <small style="font-size: 0.7rem;">{{ case.assigned_to.username|default:"Unassigned" }}</small>
+        </div>
+
+        <div class="mb-1" style="margin-bottom: 0.25rem !important;">
+          <small class="text-muted d-block" style="font-size: 0.65rem; font-weight: 600;">Contract</small>
+          <small style="font-size: 0.7rem;">{{ case.contract_date|default:"-" }}</small>
+        </div>
+
+        <div>
+          <small class="text-muted d-block" style="font-size: 0.65rem; font-weight: 600;">Created</small>
+          <small style="font-size: 0.7rem;">{{ case.created_at|date:"M d, Y" }}</small>
+        </div>
+      </div>
+
+      <!-- Card Footer -->
+      <div class="card-footer bg-light p-1" style="padding: 0.3rem !important;">
+        <a href="{% url 'cases:detail' case.pk %}" class="btn btn-outline-primary btn-sm w-100" style="font-size: 0.65rem; padding: 0.2rem 0.25rem;">
+          <i class="bi bi-eye"></i> View
+        </a>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col-12">
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle"></i>
+      No cases found.
+    </div>
+  </div>
+  {% endfor %}
 </div>
 
 {% include "includes/pagination.html" %}
+
+<style>
+  .card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    font-size: 0.75rem;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .card .small {
+    font-size: 0.7rem;
+    line-height: 1.2;
+  }
+
+  .card-title {
+    line-height: 1.2;
+  }
+
+  .badge {
+    line-height: 1;
+  }
+</style>
 {% endblock %}

@@ -28,6 +28,7 @@ from .filter_service import (
     JobFilterService,
     JobStatisticsService,
     CountyQueryService,
+    ProspectFilterService,
 )
 
 from .job_utils import (
@@ -58,6 +59,7 @@ __all__ = [
     'JobFilterService',
     'JobStatisticsService',
     'CountyQueryService',
+    'ProspectFilterService',
     # Utilities
     'JobCloneService',
     'JobDateService',

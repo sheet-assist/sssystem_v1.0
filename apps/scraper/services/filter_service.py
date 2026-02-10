@@ -300,3 +300,91 @@ class CountyQueryService:
             }
         except County.DoesNotExist:
             return None
+
+# ============================================================================
+# PROSPECT FILTERING SERVICE
+# ============================================================================
+
+class ProspectFilterService:
+    """Advanced filtering for Prospect queryset - financial criteria"""
+    
+    @staticmethod
+    def filter_by_plaintiff_max_bid(qs: QuerySet, min_bid=None, max_bid=None) -> QuerySet:
+        """Filter prospects by plaintiff max bid range"""
+        if min_bid is not None:
+            qs = qs.filter(plaintiff_max_bid__gte=min_bid)
+        if max_bid is not None:
+            qs = qs.filter(plaintiff_max_bid__lte=max_bid)
+        return qs
+    
+    @staticmethod
+    def filter_by_assessed_value(qs: QuerySet, min_value=None, max_value=None) -> QuerySet:
+        """Filter prospects by assessed value range"""
+        if min_value is not None:
+            qs = qs.filter(assessed_value__gte=min_value)
+        if max_value is not None:
+            qs = qs.filter(assessed_value__lte=max_value)
+        return qs
+    
+    @staticmethod
+    def filter_by_final_judgment(qs: QuerySet, min_judgment=None, max_judgment=None) -> QuerySet:
+        """Filter prospects by final judgment amount range"""
+        if min_judgment is not None:
+            qs = qs.filter(final_judgment_amount__gte=min_judgment)
+        if max_judgment is not None:
+            qs = qs.filter(final_judgment_amount__lte=max_judgment)
+        return qs
+    
+    @staticmethod
+    def filter_by_sale_amount(qs: QuerySet, min_sale=None, max_sale=None) -> QuerySet:
+        """Filter prospects by sale amount range"""
+        if min_sale is not None:
+            qs = qs.filter(sale_amount__gte=min_sale)
+        if max_sale is not None:
+            qs = qs.filter(sale_amount__lte=max_sale)
+        return qs
+    
+    @staticmethod
+    def apply_financial_filters(qs: QuerySet, filters: Dict) -> QuerySet:
+        """
+        Apply all financial filters to prospect queryset.
+        
+        Args:
+            qs: Prospect queryset
+            filters: Dictionary with financial filter parameters:
+                {
+                    'plaintiff_max_bid_min': 10000,
+                    'plaintiff_max_bid_max': 500000,
+                    'assessed_value_min': 50000,
+                    'assessed_value_max': 1000000,
+                    'final_judgment_min': 5000,
+                    'final_judgment_max': 250000,
+                    'sale_amount_min': 0,
+                    'sale_amount_max': 2000000,
+                }
+        
+        Returns:
+            Filtered queryset
+        """
+        qs = ProspectFilterService.filter_by_plaintiff_max_bid(
+            qs,
+            filters.get('plaintiff_max_bid_min'),
+            filters.get('plaintiff_max_bid_max')
+        )
+        qs = ProspectFilterService.filter_by_assessed_value(
+            qs,
+            filters.get('assessed_value_min'),
+            filters.get('assessed_value_max')
+        )
+        qs = ProspectFilterService.filter_by_final_judgment(
+            qs,
+            filters.get('final_judgment_min'),
+            filters.get('final_judgment_max')
+        )
+        qs = ProspectFilterService.filter_by_sale_amount(
+            qs,
+            filters.get('sale_amount_min'),
+            filters.get('sale_amount_max')
+        )
+        
+        return qs
