@@ -1,152 +1,158 @@
 """
 Parsers for realforeclose.com and realtaxdeed.com auction data.
-Extracts structured prospect data from HTML.
+Extracts structured prospect data from HTML — mirrors scrape.py logic.
 """
 import re
-from decimal import Decimal
-from datetime import datetime
+from decimal import Decimal, InvalidOperation
+
 from bs4 import BeautifulSoup
 
-
+# Regex-based label mapping (from scrape.py)
 LABEL_REGEX_MAP = {
-    r"auction\s*type": "Auction Type",
-    r"case\s*#|case\s*number": "Case #",
-    r"final\s*judgment": "Final Judgment Amount",
-    r"parcel\s*id": "Parcel ID",
-    r"property\s*address": "Property Address",
-    r"assessed\s*value": "Assessed Value",
-    r"plaintiff\s*max\s*bid": "Plaintiff Max Bid",
+    r"auction\s*type": "auction_type",
+    r"case\s*#|case\s*number": "case_number",
+    r"final\s*judgment": "final_judgment_amount",
+    r"parcel\s*id": "parcel_id",
+    r"property\s*address": "property_address",
+    r"assessed\s*value": "assessed_value",
+    r"plaintiff\s*max\s*bid": "plaintiff_max_bid",
 }
+
+CURRENCY_FIELDS = {"final_judgment_amount", "assessed_value", "plaintiff_max_bid"}
 
 
 def parse_currency(text):
-    """Convert currency string (e.g., '$1,234.56') to Decimal."""
+    """Convert currency string like '$1,234.56' to Decimal or None."""
     if not text:
         return None
-    text = re.sub(r'[^\d.]', '', text.strip())
+    cleaned = re.sub(r"[^\d.]", "", text.strip())
     try:
-        return Decimal(text)
-    except:
+        return Decimal(cleaned)
+    except (InvalidOperation, ValueError):
         return None
 
 
-def parse_calendar_page(html, county_code):
+def parse_city_state_zip(text):
+    """Split 'City, ST 12345' into (city, state, zip)."""
+    if not text:
+        return "", "", ""
+    parts = text.strip().split(",")
+    city = parts[0].strip() if parts else ""
+    state = ""
+    zip_code = ""
+    if len(parts) > 1:
+        rest = parts[1].strip().split()
+        if rest:
+            state = rest[0]
+        if len(rest) > 1:
+            zip_code = rest[1]
+    return city, state, zip_code
+
+
+def parse_calendar_page(html):
     """
-    Parse calendar page HTML from realforeclose.com.
-    Returns list of auction dicts for the calendar.
+    Parse calendar page HTML from realforeclose.com / realtaxdeed.com.
+    Returns list of raw auction dicts — one per .AUCTION_ITEM element.
+    Mirrors scrape.py rundates() logic exactly.
     """
-    soup = BeautifulSoup(html, 'html.parser')
+    soup = BeautifulSoup(html, "html.parser")
     auctions = []
-    
-    # Find auction item divs (class AUCTION_ITEM)
-    for item in soup.select('.AUCTION_ITEM'):
-        auction_id = item.get('aid', '')
-        
-        # Extract start time and status
-        status_elem = item.select_one('.ASTAT_MSGB')
-        start_time = status_elem.get_text(strip=True) if status_elem else ''
-        
+
+    for item in soup.select(".AUCTION_ITEM"):
+        auction_id = item.get("aid", "")
+
+        # Start time / status from .ASTAT_MSGB
+        status_elem = item.select_one(".ASTAT_MSGB")
+        start_time = status_elem.get_text(strip=True) if status_elem else ""
+
+        # Determine status
+        auction_status = ""
+        if "Canceled" in start_time or "Cancelled" in start_time:
+            auction_status = "cancelled"
+            start_time = ""
+        elif "Postponed" in start_time:
+            auction_status = "postponed"
+            start_time = ""
+
         record = {
-            'auction_id': auction_id,
-            'start_time': start_time,
-            'county_code': county_code,
-            'auction_type': '',
-            'case_number': '',
-            'final_judgment_amount': None,
-            'parcel_id': '',
-            'property_address': '',
-            'city_state_zip': '',
-            'assessed_value': None,
-            'plaintiff_max_bid': None,
-            'auction_status': 'scheduled',
-            'sold_amount': None,
-            'sold_to': '',
+            "auction_id": auction_id,
+            "start_time": start_time,
+            "auction_type": "",
+            "case_number": "",
+            "final_judgment_amount": None,
+            "parcel_id": "",
+            "property_address": "",
+            "city_state_zip": "",
+            "assessed_value": None,
+            "plaintiff_max_bid": None,
+            "auction_status": auction_status,
+            "sold_amount": None,
+            "sold_to": "",
         }
-        
-        # Check for canceled status
-        if 'Canceled' in start_time or 'Postponed' in start_time:
-            record['auction_status'] = 'canceled' if 'Canceled' in start_time else 'postponed'
-            start_time = ''
-        
-        # Parse auction details table
-        for row in item.select('.AUCTION_DETAILS table.ad_tab tr'):
-            tds = row.select('td')
+
+        # ---- AUCTION DETAILS (regex label matching, same as scrape.py) ----
+        for row in item.select(".AUCTION_DETAILS table.ad_tab tr"):
+            tds = row.select("td")
             if len(tds) < 2:
                 continue
-            
-            raw_label = tds[0].get_text(' ', strip=True).lower()
-            value = tds[1].get_text(' ', strip=True)
-            
-            # City/State/Zip is empty label
-            if raw_label == '':
-                record['city_state_zip'] = value
+
+            raw_label = tds[0].get_text(" ", strip=True).lower()
+            value = tds[1].get_text(" ", strip=True)
+
+            # Empty label = City/State/Zip row
+            if raw_label == "":
+                record["city_state_zip"] = value
                 continue
-            
-            # Match label to known fields
-            for regex_pattern, field_name in LABEL_REGEX_MAP.items():
-                if re.search(regex_pattern, raw_label):
-                    if field_name == 'Auction Type':
-                        record['auction_type'] = value
-                    elif field_name == 'Case #':
-                        record['case_number'] = value
-                    elif field_name == 'Final Judgment Amount':
-                        record['final_judgment_amount'] = parse_currency(value)
-                    elif field_name == 'Parcel ID':
-                        record['parcel_id'] = value
-                    elif field_name == 'Property Address':
-                        record['property_address'] = value
-                    elif field_name == 'Assessed Value':
-                        record['assessed_value'] = parse_currency(value)
-                    elif field_name == 'Plaintiff Max Bid':
-                        record['plaintiff_max_bid'] = parse_currency(value)
+
+            for pattern, field_name in LABEL_REGEX_MAP.items():
+                if re.search(pattern, raw_label, re.IGNORECASE):
+                    if field_name in CURRENCY_FIELDS:
+                        record[field_name] = parse_currency(value)
+                    else:
+                        record[field_name] = value
                     break
-        
+
+        # ---- SOLD DETAILS (from .AUCTION_STATS, same as scrape.py) ----
+        auction_stats = item.select_one(".AUCTION_STATS")
+        if auction_stats and not auction_status:
+            record["auction_status"] = "sold"
+            sold_amount_elem = auction_stats.select_one(".ASTAT_MSGD")
+            sold_to_elem = auction_stats.select_one(".ASTAT_MSG_SOLDTO_MSG")
+            if sold_amount_elem:
+                record["sold_amount"] = parse_currency(sold_amount_elem.get_text(strip=True))
+            if sold_to_elem:
+                record["sold_to"] = sold_to_elem.get_text(strip=True)
+
         auctions.append(record)
-    
+
     return auctions
 
 
-def normalize_prospect_data(raw_data, auction_date, prospect_type='TD'):
+def normalize_prospect_data(raw, auction_date, prospect_type, source_url=""):
     """
-    Normalize raw auction data to prospect model fields.
-    raw_data: dict from parse_calendar_page
-    auction_date: datetime.date
+    Convert raw parsed auction dict into Prospect-model-compatible dict.
+    Maps every field from scrape.py output.
     """
+    city, state, zip_code = parse_city_state_zip(raw.get("city_state_zip", ""))
+
     return {
-        'prospect_type': prospect_type,
-        'auction_item_number': raw_data.get('auction_id', ''),
-        'case_number': raw_data.get('case_number', ''),
-        'case_style': '',  # Not extracted from calendar page
-        'county_code': raw_data.get('county_code'),
-        'property_address': raw_data.get('property_address', ''),
-        'city': raw_data.get('city_state_zip', '').split(',')[0].strip() if raw_data.get('city_state_zip') else '',
-        'state': 'FL',
-        'zip_code': '',
-        'parcel_id': raw_data.get('parcel_id', ''),
-        'final_judgment_amount': raw_data.get('final_judgment_amount'),
-        'opening_bid': None,
-        'plaintiff_max_bid': raw_data.get('plaintiff_max_bid'),
-        'assessed_value': raw_data.get('assessed_value'),
-        'auction_date': auction_date,
-        'auction_status': raw_data.get('auction_status', 'scheduled'),
-        'plaintiff_name': '',
-        'defendant_name': '',
-        'property_type': '',
-        'legal_description': '',
-        'source_url': '',
-        'raw_data': raw_data,
+        "prospect_type": prospect_type,
+        "auction_item_number": raw.get("auction_id", ""),
+        "case_number": raw.get("case_number", ""),
+        "auction_type": raw.get("auction_type", ""),
+        "property_address": raw.get("property_address", ""),
+        "city": city,
+        "state": state,
+        "zip_code": zip_code,
+        "parcel_id": raw.get("parcel_id", ""),
+        "final_judgment_amount": raw.get("final_judgment_amount"),
+        "plaintiff_max_bid": raw.get("plaintiff_max_bid"),
+        "assessed_value": raw.get("assessed_value"),
+        "sale_amount": raw.get("sold_amount"),
+        "sold_to": raw.get("sold_to", ""),
+        "auction_date": auction_date,
+        "auction_time": raw.get("start_time", ""),
+        "auction_status": raw.get("auction_status", ""),
+        "source_url": source_url,
+        "raw_data": raw,
     }
-
-
-def calculate_surplus(prospect_data):
-    """
-    Estimate surplus amount: sale_amount - opening_bid - costs.
-    For now, just use assessed_value - opening_bid as proxy.
-    """
-    assessed_val = prospect_data.get('assessed_value')
-    opening_bid = prospect_data.get('opening_bid')
-    
-    if assessed_val and opening_bid:
-        return assessed_val - opening_bid
-    
-    return None

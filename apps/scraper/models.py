@@ -21,7 +21,8 @@ class ScrapeJob(models.Model):
 
     county = models.ForeignKey('locations.County', on_delete=models.CASCADE, related_name='scrape_jobs')
     job_type = models.CharField(max_length=8, choices=JOB_TYPE)
-    target_date = models.DateField()
+    target_date = models.DateField(help_text="Start date for scraping")
+    end_date = models.DateField(null=True, blank=True, help_text="End date (inclusive). Leave blank for single date.")
     status = models.CharField(max_length=32, choices=JOB_STATUS, default='pending')
     triggered_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     

@@ -1,5 +1,13 @@
+from datetime import date
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
+
+from apps.cases.models import Case
+from apps.locations.models import County, State
+from apps.prospects.models import Prospect, log_prospect_action
+from apps.scraper.models import ScrapeJob
 
 from .models import UserProfile
 
@@ -92,3 +100,101 @@ class AccessControlTest(TestCase):
         c.login(username="adm", password="pass")
         resp = c.get("/accounts/users/")
         self.assertEqual(resp.status_code, 200)
+
+
+class DashboardTest(TestCase):
+    def setUp(self):
+        self.state = State.objects.create(name="Florida", abbreviation="FL")
+        self.county = County.objects.create(
+            state=self.state, name="Miami-Dade", slug="miami-dade",
+            taxdeed_url="https://miami-dade.realtaxdeed.com",
+        )
+        self.admin = User.objects.create_superuser(username="admin", password="pass")
+        self.user = User.objects.create_user(username="worker", password="pass")
+        self.client = Client()
+
+    def test_dashboard_requires_login(self):
+        resp = self.client.get("/dashboard/")
+        self.assertEqual(resp.status_code, 302)
+
+    def test_dashboard_renders_for_admin(self):
+        self.client.login(username="admin", password="pass")
+        resp = self.client.get("/dashboard/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Dashboard")
+        self.assertContains(resp, "Total Prospects")
+        self.assertContains(resp, "Active Cases")
+        self.assertContains(resp, "Conversion Rate")
+
+    def test_dashboard_shows_correct_prospect_counts(self):
+        Prospect.objects.create(
+            prospect_type="TD", case_number="001", county=self.county,
+            auction_date=date(2026, 3, 1), qualification_status="qualified",
+        )
+        Prospect.objects.create(
+            prospect_type="TD", case_number="002", county=self.county,
+            auction_date=date(2026, 3, 1), qualification_status="disqualified",
+        )
+        Prospect.objects.create(
+            prospect_type="TD", case_number="003", county=self.county,
+            auction_date=date(2026, 3, 1), qualification_status="pending",
+        )
+        self.client.login(username="admin", password="pass")
+        resp = self.client.get("/dashboard/")
+        self.assertContains(resp, "3")  # total
+        self.assertContains(resp, "1 qualified")
+        self.assertContains(resp, "1 disqualified")
+        self.assertContains(resp, "1 pending")
+
+    def test_dashboard_shows_case_stats(self):
+        p = Prospect.objects.create(
+            prospect_type="TD", case_number="100", county=self.county,
+            auction_date=date(2026, 3, 1),
+        )
+        Case.objects.create(prospect=p, case_type="TD", county=self.county, status="active")
+        self.client.login(username="admin", password="pass")
+        resp = self.client.get("/dashboard/")
+        self.assertContains(resp, "1")  # active cases
+
+    def test_dashboard_pipeline(self):
+        Prospect.objects.create(
+            prospect_type="TD", case_number="P1", county=self.county,
+            auction_date=date(2026, 3, 1), workflow_status="new",
+        )
+        Prospect.objects.create(
+            prospect_type="TD", case_number="P2", county=self.county,
+            auction_date=date(2026, 3, 1), workflow_status="assigned",
+        )
+        self.client.login(username="admin", password="pass")
+        resp = self.client.get("/dashboard/")
+        self.assertContains(resp, "Prospect Pipeline")
+        self.assertContains(resp, "New")
+        self.assertContains(resp, "Assigned")
+
+    def test_dashboard_recent_activity(self):
+        p = Prospect.objects.create(
+            prospect_type="TD", case_number="ACT-001", county=self.county,
+            auction_date=date(2026, 3, 1),
+        )
+        log_prospect_action(p, self.admin, "created", "Test action")
+        self.client.login(username="admin", password="pass")
+        resp = self.client.get("/dashboard/")
+        self.assertContains(resp, "Recent Activity")
+        self.assertContains(resp, "ACT-001")
+
+    def test_dashboard_scraper_status_admin_only(self):
+        ScrapeJob.objects.create(
+            county=self.county, job_type="TD", target_date=date(2026, 3, 1),
+        )
+        self.client.login(username="admin", password="pass")
+        resp = self.client.get("/dashboard/")
+        self.assertContains(resp, "Scraper Status")
+
+    def test_dashboard_non_admin_shows_my_work(self):
+        self.user.profile.role = "prospects_and_cases"
+        self.user.profile.save()
+        self.client.login(username="worker", password="pass")
+        resp = self.client.get("/dashboard/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "My Work")
+        self.assertNotContains(resp, "Scraper Status")

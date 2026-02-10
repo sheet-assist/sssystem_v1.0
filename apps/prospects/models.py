@@ -59,8 +59,10 @@ class Prospect(models.Model):
     assessed_value = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     surplus_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     sale_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    sold_to = models.CharField(max_length=255, blank=True, default="")
 
     # Schedule
+    auction_type = models.CharField(max_length=100, blank=True, default="")
     auction_date = models.DateField(null=True, blank=True)
     auction_time = models.TimeField(null=True, blank=True)
     auction_status = models.CharField(max_length=32, choices=AUCTION_STATUS_CHOICES, blank=True, default="")

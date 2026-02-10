@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Create Scrape Job{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <h2>Create Scrape Job</h2>
+    <div class="card">
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="id_county" class="form-label">County</label>
+            {{ form.county }}
+            {% if form.county.errors %}<div class="text-danger small">{{ form.county.errors.0 }}</div>{% endif %}
+          </div>
+          <div class="mb-3">
+            <label for="id_job_type" class="form-label">Job Type</label>
+            {{ form.job_type }}
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="id_target_date" class="form-label">Start Date</label>
+              {{ form.target_date }}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="id_end_date" class="form-label">End Date (optional)</label>
+              {{ form.end_date }}
+              <small class="text-muted">Leave blank for a single date.</small>
+            </div>
+          </div>
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger">{{ form.non_field_errors.0 }}</div>
+          {% endif %}
+          <button type="submit" class="btn btn-primary">Create Job</button>
+          <a href="{% url 'scraper:dashboard' %}" class="btn btn-secondary">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,6 +1,79 @@
 {% extends "base.html" %}
-{% block title %}Coming Soon{% endblock %}
+{% block title %}Scraper Dashboard{% endblock %}
 {% block content %}
-<h2>Coming Soon</h2>
-<p class="text-muted">This section is under construction.</p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2>Scraper Dashboard</h2>
+  <a href="{% url 'scraper:job_create' %}" class="btn btn-primary">New Scrape Job</a>
+</div>
+
+<div class="row mb-4">
+  <div class="col-md-4">
+    <div class="card text-center">
+      <div class="card-body">
+        <h5 class="card-title">Total Jobs</h5>
+        <p class="display-6">{{ total_jobs }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center">
+      <div class="card-body">
+        <h5 class="card-title">Running Now</h5>
+        <p class="display-6 {% if running_jobs > 0 %}text-warning{% endif %}">{{ running_jobs }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center">
+      <div class="card-body">
+        <h5 class="card-title">Quick Actions</h5>
+        <a href="{% url 'scraper:job_list' %}" class="btn btn-outline-secondary btn-sm">All Jobs</a>
+        <a href="{% url 'scraper:job_create' %}" class="btn btn-outline-primary btn-sm">Create Job</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><strong>Recent Jobs</strong></div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>ID</th>
+          <th>County</th>
+          <th>Type</th>
+          <th>Date(s)</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th>Prospects</th>
+          <th>By</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in recent_jobs %}
+        <tr>
+          <td><a href="{% url 'scraper:job_detail' job.pk %}">{{ job.pk }}</a></td>
+          <td>{{ job.county.name }}</td>
+          <td><span class="badge bg-secondary">{{ job.get_job_type_display }}</span></td>
+          <td>
+            {{ job.target_date }}{% if job.end_date %} &rarr; {{ job.end_date }}{% endif %}
+          </td>
+          <td>
+            {% if job.status == "completed" %}<span class="badge bg-success">Completed</span>
+            {% elif job.status == "running" %}<span class="badge bg-warning text-dark">Running</span>
+            {% elif job.status == "failed" %}<span class="badge bg-danger">Failed</span>
+            {% else %}<span class="badge bg-secondary">Pending</span>{% endif %}
+          </td>
+          <td>{{ job.created_at|date:"M d, H:i" }}</td>
+          <td>+{{ job.prospects_created }} / ~{{ job.prospects_updated }}</td>
+          <td>{{ job.triggered_by.username|default:"-" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted">No scrape jobs yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endblock %}

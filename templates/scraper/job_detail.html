@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Job #{{ object.pk }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2>Scrape Job #{{ object.pk }}
+    {% if object.status == "completed" %}<span class="badge bg-success">Completed</span>
+    {% elif object.status == "running" %}<span class="badge bg-warning text-dark">Running</span>
+    {% elif object.status == "failed" %}<span class="badge bg-danger">Failed</span>
+    {% else %}<span class="badge bg-secondary">Pending</span>{% endif %}
+  </h2>
+  <div>
+    {% if object.status != "running" %}
+    <form method="post" action="{% url 'scraper:job_run' object.pk %}" class="d-inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-success">
+        {% if object.status == "pending" %}Run Now{% else %}Re-run{% endif %}
+      </button>
+    </form>
+    {% endif %}
+    <a href="{% url 'scraper:job_list' %}" class="btn btn-sm btn-outline-secondary">Back to Jobs</a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-6">
+    <div class="card mb-3">
+      <div class="card-header"><strong>Job Details</strong></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-5">County</dt>
+          <dd class="col-sm-7">{{ object.county.name }}, {{ object.county.state.abbreviation }}</dd>
+          <dt class="col-sm-5">Type</dt>
+          <dd class="col-sm-7">{{ object.get_job_type_display }}</dd>
+          <dt class="col-sm-5">Date Range</dt>
+          <dd class="col-sm-7">{{ object.target_date }}{% if object.end_date %} &rarr; {{ object.end_date }}{% endif %}</dd>
+          <dt class="col-sm-5">Triggered By</dt>
+          <dd class="col-sm-7">{{ object.triggered_by.username|default:"-" }}</dd>
+          <dt class="col-sm-5">Created</dt>
+          <dd class="col-sm-7">{{ object.created_at|date:"M d, Y H:i" }}</dd>
+          {% if object.started_at %}
+          <dt class="col-sm-5">Started</dt>
+          <dd class="col-sm-7">{{ object.started_at|date:"M d, Y H:i" }}</dd>
+          {% endif %}
+          {% if object.completed_at %}
+          <dt class="col-sm-5">Completed</dt>
+          <dd class="col-sm-7">{{ object.completed_at|date:"M d, Y H:i" }}</dd>
+          {% endif %}
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card mb-3">
+      <div class="card-header"><strong>Results</strong></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-6">Prospects Created</dt>
+          <dd class="col-sm-6">{{ object.prospects_created }}</dd>
+          <dt class="col-sm-6">Prospects Updated</dt>
+          <dd class="col-sm-6">{{ object.prospects_updated }}</dd>
+          <dt class="col-sm-6">Qualified</dt>
+          <dd class="col-sm-6"><span class="text-success">{{ object.prospects_qualified }}</span></dd>
+          <dt class="col-sm-6">Disqualified</dt>
+          <dd class="col-sm-6"><span class="text-danger">{{ object.prospects_disqualified }}</span></dd>
+        </dl>
+        {% if object.error_message %}
+        <div class="alert alert-danger mt-2 mb-0">
+          <strong>Error:</strong> {{ object.error_message }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><strong>Logs (recent 50)</strong></div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>Time</th>
+          <th>Level</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr class="{% if log.level == 'error' %}table-danger{% elif log.level == 'warning' %}table-warning{% endif %}">
+          <td>{{ log.created_at|date:"H:i:s" }}</td>
+          <td><span class="badge {% if log.level == 'error' %}bg-danger{% elif log.level == 'warning' %}bg-warning text-dark{% else %}bg-info{% endif %}">{{ log.level }}</span></td>
+          <td>{{ log.message }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" class="text-center text-muted">No logs yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

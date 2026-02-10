@@ -1,8 +1,13 @@
 from django.urls import path
-from django.views.generic import TemplateView
+
+from . import views
 
 app_name = "scraper"
 
 urlpatterns = [
-    path("dashboard/", TemplateView.as_view(template_name="scraper/dashboard.html"), name="dashboard"),
+    path("dashboard/", views.ScraperDashboardView.as_view(), name="dashboard"),
+    path("jobs/", views.ScrapeJobListView.as_view(), name="job_list"),
+    path("jobs/create/", views.ScrapeJobCreateView.as_view(), name="job_create"),
+    path("jobs/<int:pk>/", views.ScrapeJobDetailView.as_view(), name="job_detail"),
+    path("jobs/<int:pk>/run/", views.ScrapeJobRunView.as_view(), name="job_run"),
 ]

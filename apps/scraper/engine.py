@@ -1,188 +1,207 @@
 """
-Playwright-based scraper for realforeclose.com and realtaxdeed.com.
-Handles headless browser automation, pagination, and data extraction.
+Playwright-based scraper engine for realforeclose.com / realtaxdeed.com.
+Uses county URL fields directly — no hardcoded URL generation.
+Mirrors scrape.py run_auctions() pattern: Playwright + BS4.
 """
 import random
 import time
-from datetime import datetime
-from playwright.sync_api import sync_playwright
-from .parsers import parse_calendar_page, normalize_prospect_data
+from datetime import timedelta
+
+from django.utils import timezone
+
 from .models import ScrapeJob, ScrapeLog
+from .parsers import normalize_prospect_data, parse_calendar_page
 
 
-class RealtdmScraper:
-    """Scrapes realforeclose.com or realtaxdeed.com for auction listings."""
-    
-    def __init__(self, job):
-        self.job = job
-        self.base_url = self.get_base_url()
-    
-    def get_base_url(self):
-        """Get base URL for county from county config."""
-        county_config = self.job.county
-        # Use taxdeed_url if available, else realforeclose_url
-        if self.job.job_type == 'TD':
-            return county_config.taxdeed_url or f"https://{county_config.slug}.realtaxdeed.com"
-        else:
-            return county_config.foreclosure_url or f"https://{county_config.slug}.realforeclose.com"
-    
-    def log(self, level, message, raw_html=''):
-        """Create a ScrapeLog entry."""
-        ScrapeLog.objects.create(
-            job=self.job,
-            level=level,
-            message=message,
-            raw_html=raw_html[:5000] if raw_html else ''  # Truncate HTML
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Connection": "keep-alive",
+}
+
+
+def get_base_url(county, job_type):
+    """
+    Get the base URL from county fields. No fallback generation.
+    Raises ValueError if URL not configured.
+    """
+    if job_type == "TD":
+        url = county.taxdeed_url
+    else:
+        url = county.foreclosure_url
+
+    if not url:
+        raise ValueError(
+            f"No {'taxdeed_url' if job_type == 'TD' else 'foreclosure_url'} "
+            f"configured for county {county.name}. Set it in County admin."
         )
-    
-    def random_delay(self, min_sec=1, max_sec=3):
-        """Random delay to avoid rate limiting."""
-        time.sleep(random.uniform(min_sec, max_sec))
-    
-    def scrape_date(self, auction_date):
-        """
-        Scrape auctions for a single date.
-        Returns list of normalized prospect dicts.
-        """
-        prospects = []
-        
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            )
-            
-            try:
-                # Navigate to calendar URL
-                url = self._build_calendar_url(auction_date)
-                self.log('info', f'Navigating to {url}')
-                
-                page.goto(url, wait_until='domcontentloaded', timeout=30000)
-                self.random_delay(1, 2)
-                
-                # Wait for auctions to load
-                try:
-                    page.wait_for_selector('.AUCTION_ITEM', timeout=20000)
-                except:
-                    self.log('warning', f'No auctions found for {auction_date}')
-                    return prospects
-                
-                # Get page content and parse
-                html = page.content()
-                raw_auctions = parse_calendar_page(html, self.job.county.slug)
-                
-                self.log('info', f'Found {len(raw_auctions)} auctions')
-                
-                # Normalize each auction
-                for raw in raw_auctions:
-                    try:
-                        prospect = normalize_prospect_data(raw, auction_date, self.job.job_type)
-                        prospects.append(prospect)
-                    except Exception as e:
-                        self.log('error', f'Failed to normalize auction {raw.get("auction_id")}: {str(e)}')
-                
-                # Check for pagination
-                prospects.extend(self._scrape_pages(page, auction_date))
-                
-            except Exception as e:
-                self.log('error', f'Scrape failed for {auction_date}: {str(e)}', page.content())
-                raise
-            finally:
-                browser.close()
-        
-        return prospects
-    
-    def _build_calendar_url(self, auction_date):
-        """Build calendar page URL for a date."""
-        date_str = auction_date.strftime('%m/%d/%Y')
-        return f"{self.base_url}/index.cfm?zaction=AUCTION&Zmethod=PREVIEW&AUCTIONDATE={date_str}"
-    
-    def _scrape_pages(self, page, auction_date):
-        """Handle pagination if present."""
-        prospects = []
-        # Implement pagination logic if needed
-        return prospects
+    return url.rstrip("/")
+
+
+def build_auction_url(base_url, auction_date):
+    """Build the full calendar URL for a date — same format as scrape.py."""
+    date_str = auction_date.strftime("%m/%d/%Y")
+    return f"{base_url}/index.cfm?zaction=AUCTION&Zmethod=PREVIEW&AUCTIONDATE={date_str}"
+
+
+def scrape_single_date(page, base_url, auction_date, log_fn):
+    """
+    Scrape auctions for a single date using an existing Playwright page.
+    Mirrors scrape.py rundates() logic.
+    Returns list of raw auction dicts from the parser.
+    """
+    url = build_auction_url(base_url, auction_date)
+    log_fn("info", f"Navigating to {url}")
+
+    page.goto(url, wait_until="domcontentloaded", timeout=30000)
+    time.sleep(random.uniform(1, 2))
+
+    try:
+        page.wait_for_selector(".AUCTION_ITEM", timeout=20000)
+    except Exception:
+        log_fn("warning", f"No auctions found for {auction_date}")
+        return [], url
+
+    html = page.content()
+    raw_auctions = parse_calendar_page(html)
+    log_fn("info", f"Found {len(raw_auctions)} auctions for {auction_date}")
+    return raw_auctions, url
 
 
 def run_scrape_job(job):
     """
-    Execute a scrape job: download, parse, create/update prospects, qualify, log results.
+    Execute a ScrapeJob: iterate dates, scrape, create/update Prospects, qualify.
+    Uses a single Playwright browser session across all dates (like scrape.py run_auctions).
     """
-    from apps.settings_app.utils import evaluate_prospect
+    from playwright.sync_api import sync_playwright
+
     from apps.prospects.models import Prospect
-    from apps.locations.models import County
-    from django.utils import timezone
-    
-    job.status = 'running'
+    from apps.settings_app.evaluation import evaluate_prospect
+
+    job.status = "running"
     job.started_at = timezone.now()
     job.save()
-    
+
+    def log_fn(level, message, raw_html=""):
+        ScrapeLog.objects.create(
+            job=job, level=level, message=message,
+            raw_html=raw_html[:5000] if raw_html else "",
+        )
+
     try:
-        scraper = RealtdmScraper(job)
-        prospects_data = scraper.scrape_date(job.target_date)
-        
+        county = job.county
+        base_url = get_base_url(county, job.job_type)
+
+        # Build date range
+        start_date = job.target_date
+        end_date = job.end_date or job.target_date
+        dates = []
+        current = start_date
+        while current <= end_date:
+            dates.append(current)
+            current += timedelta(days=1)
+
         created = 0
         updated = 0
-        qualified = 0
-        disqualified = 0
-        
-        for prospect_data in prospects_data:
+        qualified_count = 0
+        disqualified_count = 0
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(
+                extra_http_headers={**HEADERS, "Referer": base_url}
+            )
+
             try:
-                county = job.county
-                
-                # Try to get existing prospect
-                prospect_obj, is_new = Prospect.objects.get_or_create(
-                    county=county,
-                    case_number=prospect_data['case_number'],
-                    auction_date=prospect_data['auction_date'],
-                    defaults={
-                        'prospect_type': prospect_data['prospect_type'],
-                        'auction_item_number': prospect_data['auction_item_number'],
-                        'property_address': prospect_data['property_address'],
-                        'parcel_id': prospect_data['parcel_id'],
-                        'final_judgment_amount': prospect_data['final_judgment_amount'],
-                        'plaintiff_max_bid': prospect_data['plaintiff_max_bid'],
-                        'assessed_value': prospect_data['assessed_value'],
-                        'auction_status': prospect_data['auction_status'],
-                        'raw_data': prospect_data['raw_data'],
-                    }
-                )
-                
-                if is_new:
-                    created += 1
-                else:
-                    updated += 1
-                
-                # Evaluate qualification
-                qualification_result = evaluate_prospect(prospect_data, county)
-                if qualification_result:
-                    prospect_obj.qualification_status = 'qualified'
-                    qualified += 1
-                else:
-                    prospect_obj.qualification_status = 'disqualified'
-                    disqualified += 1
-                
-                prospect_obj.save()
-                
-            except Exception as e:
-                scraper.log('error', f'Failed to save prospect {prospect_data.get("case_number")}: {str(e)}')
-        
+                for d in dates:
+                    raw_auctions, source_url = scrape_single_date(page, base_url, d, log_fn)
+
+                    for raw in raw_auctions:
+                        try:
+                            data = normalize_prospect_data(raw, d, job.job_type, source_url)
+                            case_number = data["case_number"]
+                            if not case_number:
+                                log_fn("warning", f"Skipped auction with no case number: {raw.get('auction_id')}")
+                                continue
+
+                            prospect, is_new = Prospect.objects.get_or_create(
+                                county=county,
+                                case_number=case_number,
+                                auction_date=d,
+                                defaults={
+                                    "prospect_type": data["prospect_type"],
+                                    "auction_item_number": data["auction_item_number"],
+                                    "auction_type": data["auction_type"],
+                                    "property_address": data["property_address"],
+                                    "city": data["city"],
+                                    "state": data["state"],
+                                    "zip_code": data["zip_code"],
+                                    "parcel_id": data["parcel_id"],
+                                    "final_judgment_amount": data["final_judgment_amount"],
+                                    "plaintiff_max_bid": data["plaintiff_max_bid"],
+                                    "assessed_value": data["assessed_value"],
+                                    "sale_amount": data["sale_amount"],
+                                    "sold_to": data["sold_to"],
+                                    "auction_status": data["auction_status"],
+                                    "source_url": data["source_url"],
+                                    "raw_data": data["raw_data"],
+                                },
+                            )
+
+                            if is_new:
+                                created += 1
+                            else:
+                                # Update mutable fields on existing prospects
+                                for field in (
+                                    "auction_status", "sale_amount", "sold_to",
+                                    "property_address", "city", "state", "zip_code",
+                                    "assessed_value", "final_judgment_amount",
+                                    "plaintiff_max_bid", "auction_type",
+                                ):
+                                    val = data.get(field)
+                                    if val not in (None, ""):
+                                        setattr(prospect, field, val)
+                                prospect.raw_data = data["raw_data"]
+                                prospect.save()
+                                updated += 1
+
+                            # Evaluate qualification
+                            is_qualified, reasons = evaluate_prospect(data, county)
+                            prospect.qualification_status = "qualified" if is_qualified else "disqualified"
+                            prospect.save(update_fields=["qualification_status"])
+
+                            if is_qualified:
+                                qualified_count += 1
+                            else:
+                                disqualified_count += 1
+
+                        except Exception as e:
+                            log_fn("error", f"Failed to save prospect {raw.get('case_number')}: {e}")
+
+            finally:
+                browser.close()
+
         # Update job results
-        job.status = 'completed'
+        job.status = "completed"
         job.prospects_created = created
         job.prospects_updated = updated
-        job.prospects_qualified = qualified
-        job.prospects_disqualified = disqualified
+        job.prospects_qualified = qualified_count
+        job.prospects_disqualified = disqualified_count
         job.completed_at = timezone.now()
         job.save()
-        
-        scraper.log('info', f'Scrape completed: {created} created, {updated} updated, {qualified} qualified')
-        
+
+        county.update_last_scraped()
+        log_fn("info", f"Completed: {created} created, {updated} updated, {qualified_count} qualified")
+
     except Exception as e:
-        job.status = 'failed'
+        job.status = "failed"
         job.error_message = str(e)
         job.completed_at = timezone.now()
         job.save()
-        
-        scraper.log('error', f'Scrape job failed: {str(e)}')
+        log_fn("error", f"Job failed: {e}")
         raise

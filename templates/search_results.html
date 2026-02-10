@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Search: {{ query }}{% endblock %}
+{% block content %}
+<h2 class="mb-3">Search Results</h2>
+
+<form method="get" action="{% url 'search' %}" class="mb-4">
+  <div class="input-group" style="max-width:500px;">
+    <input type="text" name="q" class="form-control" placeholder="Case #, parcel ID, address, name..." value="{{ query }}">
+    <button class="btn btn-primary" type="submit">Search</button>
+  </div>
+</form>
+
+{% if query and query|length >= 2 %}
+
+{# Prospect Results #}
+<div class="card mb-4">
+  <div class="card-header">
+    <strong>Prospects</strong>
+    <span class="badge bg-secondary">{{ prospects|length }}</span>
+  </div>
+  {% if prospects %}
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>Type</th>
+          <th>Case #</th>
+          <th>County</th>
+          <th>Address</th>
+          <th>Parcel ID</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in prospects %}
+        <tr>
+          <td><span class="badge bg-secondary">{{ p.get_prospect_type_display }}</span></td>
+          <td><a href="{% url 'prospects:detail' p.pk %}">{{ p.case_number }}</a></td>
+          <td>{{ p.county.name }}</td>
+          <td>{{ p.property_address|default:"-"|truncatechars:40 }}</td>
+          <td>{{ p.parcel_id|default:"-" }}</td>
+          <td>{{ p.get_workflow_status_display }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body text-muted">No prospects found.</div>
+  {% endif %}
+</div>
+
+{# Case Results #}
+<div class="card mb-4">
+  <div class="card-header">
+    <strong>Cases</strong>
+    <span class="badge bg-secondary">{{ cases|length }}</span>
+  </div>
+  {% if cases %}
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>Type</th>
+          <th>Case #</th>
+          <th>County</th>
+          <th>Address</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in cases %}
+        <tr>
+          <td><span class="badge bg-secondary">{{ c.get_case_type_display }}</span></td>
+          <td><a href="{% url 'cases:detail' c.pk %}">{{ c.case_number|default:c.pk }}</a></td>
+          <td>{{ c.county.name }}</td>
+          <td>{{ c.property_address|default:"-"|truncatechars:40 }}</td>
+          <td>{{ c.get_status_display }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body text-muted">No cases found.</div>
+  {% endif %}
+</div>
+
+{% elif query %}
+<p class="text-muted">Please enter at least 2 characters to search.</p>
+{% else %}
+<p class="text-muted">Enter a search term above.</p>
+{% endif %}
+{% endblock %}

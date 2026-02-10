@@ -1,38 +1,178 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard{% endblock %}
+{% block title %}Dashboard - SSSys{% endblock %}
 
 {% block content %}
-<h2>Dashboard</h2>
-<p class="text-muted">Welcome to Surplus Squad. Select a tab above to get started.</p>
+<h2 class="mb-4">Dashboard</h2>
 
-<div class="row g-3 mt-3">
-  <div class="col-md-4">
-    <div class="card text-center">
+{# --- Top Stats Row --- #}
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card text-center h-100">
       <div class="card-body">
-        <h5 class="card-title">Prospects</h5>
-        <p class="display-6">-</p>
-        <p class="text-muted">Total prospects</p>
+        <h6 class="card-subtitle text-muted mb-2">Total Prospects</h6>
+        <p class="display-6 mb-0">{{ total_prospects }}</p>
+      </div>
+      <div class="card-footer bg-transparent border-0 pt-0">
+        <small>
+          <span class="text-success">{{ qualified_count }} qualified</span> /
+          <span class="text-danger">{{ disqualified_count }} disqualified</span> /
+          <span class="text-warning">{{ pending_count }} pending</span>
+        </small>
       </div>
     </div>
   </div>
-  <div class="col-md-4">
-    <div class="card text-center">
+  <div class="col-md-3">
+    <div class="card text-center h-100">
       <div class="card-body">
-        <h5 class="card-title">Cases</h5>
-        <p class="display-6">-</p>
-        <p class="text-muted">Active cases</p>
+        <h6 class="card-subtitle text-muted mb-2">Active Cases</h6>
+        <p class="display-6 mb-0">{{ active_cases }}</p>
+      </div>
+      <div class="card-footer bg-transparent border-0 pt-0">
+        <small>{{ total_cases }} total &middot; <span class="text-success">{{ closed_won }} won</span> &middot; <span class="text-danger">{{ closed_lost }} lost</span></small>
       </div>
     </div>
   </div>
-  <div class="col-md-4">
-    <div class="card text-center">
+  <div class="col-md-3">
+    <div class="card text-center h-100">
       <div class="card-body">
-        <h5 class="card-title">Last Scrape</h5>
-        <p class="display-6">-</p>
-        <p class="text-muted">Most recent run</p>
+        <h6 class="card-subtitle text-muted mb-2">Conversion Rate</h6>
+        <p class="display-6 mb-0">{{ conversion_rate }}%</p>
+      </div>
+      <div class="card-footer bg-transparent border-0 pt-0">
+        <small>{{ converted_count }} of {{ total_prospects }} prospects converted</small>
       </div>
     </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <h6 class="card-subtitle text-muted mb-2">Touched / Untouched</h6>
+        <p class="display-6 mb-0">{{ touched_count }} / {{ untouched_count }}</p>
+      </div>
+      <div class="card-footer bg-transparent border-0 pt-0">
+        <small>{{ untouched_count }} prospects still at "New"</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# --- Pipeline Row --- #}
+<div class="card mb-4">
+  <div class="card-header"><strong>Prospect Pipeline</strong></div>
+  <div class="card-body">
+    <div class="row text-center">
+      {% for label, count in pipeline %}
+      <div class="col">
+        <div class="border rounded p-2">
+          <small class="text-muted d-block">{{ label }}</small>
+          <span class="fs-4 fw-bold">{{ count }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  {# --- Left: Recent Activity --- #}
+  <div class="col-lg-8">
+    <div class="card mb-4">
+      <div class="card-header"><strong>Recent Activity</strong></div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for item in recent_activity %}
+            <tr>
+              <td style="width:140px;"><small class="text-muted">{{ item.time|date:"M d, H:i" }}</small></td>
+              <td>
+                {% if item.type == "prospect" %}
+                  <span class="badge bg-info">Prospect</span>
+                {% else %}
+                  <span class="badge bg-primary">Case</span>
+                {% endif %}
+              </td>
+              <td><a href="{{ item.url }}">{{ item.ref }}</a></td>
+              <td>{{ item.action }}</td>
+              <td class="text-muted">{{ item.user.username|default:"System" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center text-muted py-3">No activity yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {# --- Right: Quick Actions & Scraper --- #}
+  <div class="col-lg-4">
+    {# Quick Actions #}
+    <div class="card mb-4">
+      <div class="card-header"><strong>Quick Actions</strong></div>
+      <div class="card-body">
+        <div class="d-grid gap-2">
+          <a href="{% url 'prospects:type_select' %}" class="btn btn-outline-primary btn-sm">Browse Prospects</a>
+          <a href="{% url 'cases:list' %}" class="btn btn-outline-secondary btn-sm">View Cases</a>
+          {% if is_admin %}
+          <a href="{% url 'scraper:job_create' %}" class="btn btn-outline-success btn-sm">New Scrape Job</a>
+          <a href="{% url 'settings_app:criteria_list' %}" class="btn btn-outline-warning btn-sm">Filter Criteria</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# Scraper Status (admin only) #}
+    {% if is_admin %}
+    <div class="card mb-4">
+      <div class="card-header"><strong>Scraper Status</strong></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-7">Total Jobs</dt>
+          <dd class="col-5">{{ total_scrape_jobs }}</dd>
+          <dt class="col-7">Running</dt>
+          <dd class="col-5">
+            {% if running_jobs > 0 %}
+              <span class="badge bg-warning text-dark">{{ running_jobs }}</span>
+            {% else %}
+              0
+            {% endif %}
+          </dd>
+          <dt class="col-7">Last Job</dt>
+          <dd class="col-5">
+            {% if last_scrape_job %}
+              <a href="{% url 'scraper:job_detail' last_scrape_job.pk %}">
+                #{{ last_scrape_job.pk }}
+                {% if last_scrape_job.status == "completed" %}<span class="badge bg-success">OK</span>
+                {% elif last_scrape_job.status == "failed" %}<span class="badge bg-danger">Failed</span>
+                {% elif last_scrape_job.status == "running" %}<span class="badge bg-warning text-dark">Running</span>
+                {% else %}<span class="badge bg-secondary">Pending</span>{% endif %}
+              </a>
+            {% else %}
+              -
+            {% endif %}
+          </dd>
+        </dl>
+        <a href="{% url 'scraper:dashboard' %}" class="btn btn-sm btn-outline-dark mt-2 w-100">Go to Scraper</a>
+      </div>
+    </div>
+    {% endif %}
+
+    {# My Stats (non-admin) #}
+    {% if not is_admin %}
+    <div class="card mb-4">
+      <div class="card-header"><strong>My Work</strong></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-8">My Prospects</dt>
+          <dd class="col-4">{{ my_prospects }}</dd>
+          <dt class="col-8">My Cases</dt>
+          <dd class="col-4">{{ my_cases }}</dd>
+        </dl>
+        <a href="{% url 'prospects:my_prospects' %}" class="btn btn-sm btn-outline-primary mt-2 w-100">View My Prospects</a>
+      </div>
+    </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
