@@ -131,7 +131,7 @@ def parse_calendar_page(html):
 def normalize_prospect_data(raw, auction_date, prospect_type, source_url=""):
     """
     Convert raw parsed auction dict into Prospect-model-compatible dict.
-    Maps every field from scrape.py output.
+    Maps every field from scrape.py output and converts currency strings to Decimal.
     """
     city, state, zip_code = parse_city_state_zip(raw.get("city_state_zip", ""))
 
@@ -145,13 +145,10 @@ def normalize_prospect_data(raw, auction_date, prospect_type, source_url=""):
         "state": state,
         "zip_code": zip_code,
         "parcel_id": raw.get("parcel_id", ""),
-        "final_judgment_amount": raw.get("final_judgment_amount"),
-        "plaintiff_max_bid": raw.get("plaintiff_max_bid"),
-        "assessed_value": raw.get("assessed_value"),
-        "sale_amount": raw.get("sold_amount"),
-        "sold_to": raw.get("sold_to", ""),
-        "auction_date": auction_date,
-        "auction_time": raw.get("start_time", ""),
+        "final_judgment_amount": parse_currency(raw.get("final_judgment_amount")),
+        "plaintiff_max_bid": parse_currency(raw.get("plaintiff_max_bid")),
+        "assessed_value": parse_currency(raw.get("assessed_value")),
+        "sale_amount": parse_currency(raw.get("sold_amount")),
         "auction_status": raw.get("auction_status", ""),
         "source_url": source_url,
         "raw_data": raw,
