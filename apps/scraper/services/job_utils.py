@@ -40,6 +40,7 @@ class JobCloneService:
         """
         cloned_job = ScrapingJob.objects.create(
             name=new_name or f"Clone of {source_job.name}",
+            group_name=source_job.group_name,
             state=source_job.state,
             county=source_job.county,
             start_date=new_start_date or source_job.start_date,

@@ -16,15 +16,18 @@
     {% for rule in criteria %}
     <div class="col-lg-6 col-xl-4">
       <div class="card h-100 {% if not rule.is_active %}opacity-50{% endif %}">
-        <!-- Card Header -->
         <div class="card-header bg-light border-bottom p-2">
           <div class="d-flex justify-content-between align-items-start">
             <div>
               <h6 class="card-title mb-1">{{ rule.name }}</h6>
               <small class="text-muted">
-                <span class="prospect-type-pill type-{{ rule.prospect_type|lower }}">
-                  {{ rule.get_prospect_type_display }}
-                </span>
+                {% if rule.prospect_types %}
+                  <span class="badge bg-secondary">{{ rule.prospect_types|join:", " }}</span>
+                {% elif rule.prospect_type %}
+                  <span class="badge bg-secondary">{{ rule.prospect_type }}</span>
+                {% else %}
+                  <span class="badge bg-secondary">All Types</span>
+                {% endif %}
               </small>
             </div>
             <div>
@@ -37,110 +40,109 @@
           </div>
         </div>
 
-        <!-- Card Body -->
         <div class="card-body p-2">
-          <!-- Scope -->
-          <div class="mb-2">
-            <small class="text-muted d-block"><strong>Scope:</strong></small>
-            <small>
-              {% if rule.county %}
-                County: <strong>{{ rule.county.name }}</strong>
-              {% elif rule.state %}
-                State: <strong>{{ rule.state.name }}</strong>
-              {% else %}
-                <em>Global</em>
+          <div class="mt-2 pt-2 border-top">
+            <small class="text-muted d-block mb-1"><strong>Summary:</strong></small>
+            <small class="d-block">{{ rule.get_verbose_summary }}</small>
+          </div>
+
+          <div class="mt-2">
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm w-100 js-params-toggle"
+              data-target-id="rule-params-{{ rule.pk }}"
+              data-show-text="Show Parameters"
+              data-hide-text="Hide Parameters"
+            >
+              Show Parameters
+            </button>
+          </div>
+
+          <div id="rule-params-{{ rule.pk }}" class="parameters-panel d-none mt-2 pt-2 border-top">
+            <div class="mb-2">
+              <small class="text-muted d-block"><strong>Scope:</strong></small>
+              <small>
+                {% if rule.county %}
+                  County: <strong>{{ rule.county.name }}</strong>
+                {% elif rule.state %}
+                  State: <strong>{{ rule.state.name }}</strong>
+                {% else %}
+                  <em>Global</em>
+                {% endif %}
+              </small>
+            </div>
+
+            <div class="mb-2">
+              <small class="text-muted d-block mb-2"><strong>Financial Criteria:</strong></small>
+              {% if rule.plaintiff_max_bid_min or rule.plaintiff_max_bid_max %}
+              <div class="small mb-2">
+                <strong>Plaintiff Max Bid:</strong>
+                {% if rule.plaintiff_max_bid_min %}${{ rule.plaintiff_max_bid_min|floatformat:0 }}{% else %}-{% endif %}
+                to
+                {% if rule.plaintiff_max_bid_max %}${{ rule.plaintiff_max_bid_max|floatformat:0 }}{% else %}-{% endif %}
+              </div>
               {% endif %}
-            </small>
-          </div>
-
-          <!-- Financial Criteria Section -->
-          <div class="mb-2">
-            <small class="text-muted d-block mb-2"><strong>Financial Criteria:</strong></small>
-            
-            <!-- Plaintiff Max Bid -->
-            {% if rule.plaintiff_max_bid_min or rule.plaintiff_max_bid_max %}
-            <div class="small mb-2">
-              <strong>Plaintiff Max Bid:</strong>
-              <br>
-              {% if rule.plaintiff_max_bid_min %}${{ rule.plaintiff_max_bid_min|floatformat:0 }}{% else %}-{% endif %}
-              to
-              {% if rule.plaintiff_max_bid_max %}${{ rule.plaintiff_max_bid_max|floatformat:0 }}{% else %}-{% endif %}
+              {% if rule.assessed_value_min or rule.assessed_value_max %}
+              <div class="small mb-2">
+                <strong>Assessed Value:</strong>
+                {% if rule.assessed_value_min %}${{ rule.assessed_value_min|floatformat:0 }}{% else %}-{% endif %}
+                to
+                {% if rule.assessed_value_max %}${{ rule.assessed_value_max|floatformat:0 }}{% else %}-{% endif %}
+              </div>
+              {% endif %}
+              {% if rule.final_judgment_min or rule.final_judgment_max %}
+              <div class="small mb-2">
+                <strong>Final Judgment:</strong>
+                {% if rule.final_judgment_min %}${{ rule.final_judgment_min|floatformat:0 }}{% else %}-{% endif %}
+                to
+                {% if rule.final_judgment_max %}${{ rule.final_judgment_max|floatformat:0 }}{% else %}-{% endif %}
+              </div>
+              {% endif %}
+              {% if rule.sale_amount_min or rule.sale_amount_max %}
+              <div class="small">
+                <strong>Sale Amount:</strong>
+                {% if rule.sale_amount_min %}${{ rule.sale_amount_min|floatformat:0 }}{% else %}-{% endif %}
+                to
+                {% if rule.sale_amount_max %}${{ rule.sale_amount_max|floatformat:0 }}{% else %}-{% endif %}
+              </div>
+              {% endif %}
             </div>
-            {% endif %}
 
-            <!-- Assessed Value -->
-            {% if rule.assessed_value_min or rule.assessed_value_max %}
-            <div class="small mb-2">
-              <strong>Assessed Value:</strong>
-              <br>
-              {% if rule.assessed_value_min %}${{ rule.assessed_value_min|floatformat:0 }}{% else %}-{% endif %}
-              to
-              {% if rule.assessed_value_max %}${{ rule.assessed_value_max|floatformat:0 }}{% else %}-{% endif %}
-            </div>
-            {% endif %}
-
-            <!-- Final Judgment -->
-            {% if rule.final_judgment_min or rule.final_judgment_max %}
-            <div class="small mb-2">
-              <strong>Final Judgment:</strong>
-              <br>
-              {% if rule.final_judgment_min %}${{ rule.final_judgment_min|floatformat:0 }}{% else %}-{% endif %}
-              to
-              {% if rule.final_judgment_max %}${{ rule.final_judgment_max|floatformat:0 }}{% else %}-{% endif %}
-            </div>
-            {% endif %}
-
-            <!-- Sale Amount -->
-            {% if rule.sale_amount_min or rule.sale_amount_max %}
-            <div class="small">
-              <strong>Sale Amount:</strong>
-              <br>
-              {% if rule.sale_amount_min %}${{ rule.sale_amount_min|floatformat:0 }}{% else %}-{% endif %}
-              to
-              {% if rule.sale_amount_max %}${{ rule.sale_amount_max|floatformat:0 }}{% else %}-{% endif %}
-            </div>
-            {% endif %}
-
-            {% if not rule.plaintiff_max_bid_min and not rule.plaintiff_max_bid_max and not rule.assessed_value_min and not rule.assessed_value_max and not rule.final_judgment_min and not rule.final_judgment_max and not rule.sale_amount_min and not rule.sale_amount_max %}
-            <small class="text-muted"><em>No financial criteria set</em></small>
-            {% endif %}
-          </div>
-
-          <!-- Other Criteria -->
-          {% if rule.min_date or rule.status_types or rule.auction_types %}
-          <div class="mb-2">
-            <small class="text-muted d-block mb-2"><strong>Other Criteria:</strong></small>
-            
-            {% if rule.min_date %}
-            <div class="small mb-2">
-              <strong>Min Auction Date:</strong> {{ rule.min_date }}
-            </div>
-            {% endif %}
-
-            {% if rule.status_types %}
-            <div class="small mb-2">
-              <strong>Status Types:</strong> {{ rule.status_types|join:", " }}
-            </div>
-            {% endif %}
-
-            {% if rule.auction_types %}
-            <div class="small">
-              <strong>Auction Types:</strong> {{ rule.auction_types|join:", " }}
+            {% if rule.min_date or rule.max_date or rule.status_types %}
+            <div class="mb-1">
+              <small class="text-muted d-block mb-2"><strong>Other Criteria:</strong></small>
+              {% if rule.min_date or rule.max_date %}
+              <div class="small mb-2">
+                <strong>Auction Dates:</strong>
+                {% if rule.min_date %}From {{ rule.min_date }}{% else %}Any{% endif %}
+                -
+                {% if rule.max_date %}To {{ rule.max_date }}{% else %}Any{% endif %}
+              </div>
+              {% endif %}
+              {% if rule.status_types %}
+              <div class="small mb-2">
+                <strong>Status Types:</strong> {{ rule.status_types|join:", " }}
+              </div>
+              {% endif %}
             </div>
             {% endif %}
           </div>
-          {% endif %}
         </div>
 
-        <!-- Card Footer -->
         <div class="card-footer bg-light p-2">
           <div class="d-flex gap-1">
-            <a href="{% url 'settings_app:criteria_edit' rule.pk %}" class="btn btn-outline-primary btn-sm flex-grow-1" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
+            <form method="post" action="{% url 'settings_app:criteria_apply' rule.pk %}" class="d-inline flex-grow-1">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-success btn-sm w-100" style="font-size: 0.85rem; padding: 0.25rem 0.5rem;">
+                <i class="bi bi-play-fill"></i> Apply Now
+              </button>
+            </form>
+            <a href="{% url 'settings_app:criteria_edit' rule.pk %}" class="btn btn-outline-primary btn-sm flex-grow-1" style="font-size: 0.85rem; padding: 0.25rem 0.5rem;">
               <i class="bi bi-pencil"></i> Edit
             </a>
             <form method="post" action="{% url 'settings_app:criteria_delete' rule.pk %}" class="d-inline" onsubmit="return confirm('Delete this rule?');">
               {% csrf_token %}
-              <button type="submit" class="btn btn-outline-danger btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
+              <button type="submit" class="btn btn-outline-danger btn-sm" style="font-size: 0.85rem; padding: 0.25rem 0.5rem;">
                 <i class="bi bi-trash"></i> Delete
               </button>
             </form>
@@ -154,7 +156,6 @@
     {% endfor %}
   </div>
 
-  <!-- Pagination -->
   {% include "includes/pagination.html" %}
 
   {% else %}
@@ -171,34 +172,14 @@
     display: inline-block;
     padding: 0.15rem 0.5rem;
     border-radius: 8px;
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
   }
 
-  .type-td {
-    background-color: #e3f2fd;
-    color: #1976d2;
-  }
-
-  .type-tl {
-    background-color: #f3e5f5;
-    color: #7b1fa2;
-  }
-
-  .type-ss {
-    background-color: #fff3e0;
-    color: #e65100;
-  }
-
-  .type-mf {
-    background-color: #e8f5e9;
-    color: #388e3c;
-  }
-
   .card {
     transition: transform 0.2s, box-shadow 0.2s;
-    font-size: 0.85rem;
+    font-size: 0.98rem;
   }
 
   .card:hover {
@@ -207,8 +188,23 @@
   }
 
   .card .small {
-    font-size: 0.75rem;
+    font-size: 0.88rem;
     line-height: 1.4;
   }
 </style>
+<script>
+  (function () {
+    const buttons = document.querySelectorAll('.js-params-toggle');
+    buttons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const targetId = btn.getAttribute('data-target-id');
+        const panel = document.getElementById(targetId);
+        if (!panel) return;
+        const isHidden = panel.classList.contains('d-none');
+        panel.classList.toggle('d-none', !isHidden);
+        btn.textContent = isHidden ? btn.getAttribute('data-hide-text') : btn.getAttribute('data-show-text');
+      });
+    });
+  })();
+</script>
 {% endblock %}

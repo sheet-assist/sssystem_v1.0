@@ -11,17 +11,18 @@ class Command(BaseCommand):
         fl_state, _ = State.objects.get_or_create(name='Florida', defaults={'abbreviation': 'FL'})
         rule, created = FilterCriteria.objects.get_or_create(
             name='Florida TD Default',
-            prospect_type='TD',
             state=fl_state,
             defaults={
-                'min_surplus_amount': 10000.00,
+                'prospect_types': ['TD'],
+                'surplus_amount_min': 10000.00,
                 'min_date': datetime.date(2024, 1, 1),
                 'status_types': ['Live', 'Upcoming'],
                 'is_active': True,
             }
         )
         if not created:
-            rule.min_surplus_amount = 10000.00
+            rule.prospect_types = ['TD']
+            rule.surplus_amount_min = 10000.00
             rule.min_date = datetime.date(2024, 1, 1)
             rule.status_types = ['Live', 'Upcoming']
             rule.is_active = True

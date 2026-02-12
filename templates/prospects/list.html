@@ -35,6 +35,10 @@
         </button>
         {% if prospect_type and state_abbr and county_slug %}
         <a href="{% url 'prospects:list' prospect_type state_abbr county_slug %}" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
+        {% elif prospect_type %}
+        <a href="{% url 'prospects:list_by_type' prospect_type %}" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
+        {% else %}
+        <a href="{% url 'prospects:list_all' %}" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
         {% endif %}
       </div>
     </form>
@@ -54,6 +58,9 @@
         <th>Qualification</th>
         <th>Workflow</th>
         <th>Assigned To</th>
+        {% if user.profile.is_admin %}
+        <th class="text-end">Actions</th>
+        {% endif %}
       </tr>
     </thead>
     <tbody>
@@ -95,10 +102,26 @@
           {% endif %}
         </td>
         <td>{% if prospect.assigned_to %}{{ prospect.assigned_to.get_full_name|default:prospect.assigned_to.username }}{% else %}<span class="text-muted">Unassigned</span>{% endif %}</td>
+        {% if user.profile.is_admin %}
+        <td class="text-end">
+          <button
+            type="button"
+            class="btn btn-outline-danger btn-sm"
+            data-bs-toggle="modal"
+            data-bs-target="#confirmDeleteProspectModal"
+            data-delete-url="{% url 'prospects:delete' prospect.pk %}"
+            data-case-number="{{ prospect.case_number }}"
+            data-next-url="{{ request.get_full_path }}"
+            onclick="event.stopPropagation();"
+          >
+            <i class="bi bi-trash"></i> Delete
+          </button>
+        </td>
+        {% endif %}
       </tr>
       {% empty %}
       <tr>
-        <td colspan="8" class="text-center text-muted py-4">No prospects found.</td>
+        <td colspan="{% if user.profile.is_admin %}9{% else %}8{% endif %}" class="text-center text-muted py-4">No prospects found.</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -106,4 +129,54 @@
 </div>
 
 {% include "includes/pagination.html" %}
+
+{% if user.profile.is_admin %}
+<div class="modal fade" id="confirmDeleteProspectModal" tabindex="-1" aria-labelledby="confirmDeleteProspectModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmDeleteProspectModalLabel">Confirm Delete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Delete prospect <strong id="deleteProspectCaseRef">-</strong>? This action cannot be undone.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <form id="deleteProspectForm" method="post" action="" class="d-inline">
+          {% csrf_token %}
+          <input type="hidden" name="next" id="deleteProspectNext" value="">
+          <button type="submit" class="btn btn-danger btn-sm">
+            <i class="bi bi-trash"></i> Delete
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const modal = document.getElementById("confirmDeleteProspectModal");
+    if (!modal) return;
+
+    modal.addEventListener("show.bs.modal", function (event) {
+      const trigger = event.relatedTarget;
+      if (!trigger) return;
+
+      const action = trigger.getAttribute("data-delete-url") || "";
+      const caseNumber = trigger.getAttribute("data-case-number") || "-";
+      const nextUrl = trigger.getAttribute("data-next-url") || "";
+
+      const form = document.getElementById("deleteProspectForm");
+      const caseRef = document.getElementById("deleteProspectCaseRef");
+      const nextInput = document.getElementById("deleteProspectNext");
+
+      if (form) form.setAttribute("action", action);
+      if (caseRef) caseRef.textContent = caseNumber;
+      if (nextInput) nextInput.value = nextUrl;
+    });
+  });
+</script>
+{% endif %}
 {% endblock %}

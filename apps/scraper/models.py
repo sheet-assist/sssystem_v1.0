@@ -22,6 +22,12 @@ class ScrapingJob(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, help_text="Descriptive name for the job")
+    group_name = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Optional label used to group related jobs",
+    )
     state = models.CharField(max_length=10, default='FL', help_text="State code (e.g., 'FL')")
     county = models.CharField(max_length=150, help_text="County name")
     
@@ -47,7 +53,8 @@ class ScrapingJob(models.Model):
         verbose_name_plural = "Scraping Jobs"
     
     def __str__(self):
-        return f"{self.name} ({self.state}/{self.county}) - {self.status}"
+        group = f"[{self.group_name}] " if self.group_name else ""
+        return f"{group}{self.name} ({self.state}/{self.county}) - {self.status}"
 
 
 class JobExecutionLog(models.Model):
@@ -178,6 +185,12 @@ class ScrapeJob(models.Model):
         ('MF', 'Mortgage Foreclosure'),
     ]
 
+    name = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Human-friendly identifier used to group related jobs",
+    )
     county = models.ForeignKey('locations.County', on_delete=models.CASCADE, related_name='scrape_jobs')
     job_type = models.CharField(max_length=8, choices=JOB_TYPE)
     target_date = models.DateField(help_text="Start date for scraping")
@@ -200,7 +213,8 @@ class ScrapeJob(models.Model):
         ordering = ('-created_at',)
 
     def __str__(self):
-        return f"ScrapeJob {self.county} {self.job_type} on {self.target_date} ({self.status})"
+        label = self.name or f"{self.county} {self.job_type}"
+        return f"ScrapeJob {label} on {self.target_date} ({self.status})"
 
 
 class ScrapeLog(models.Model):

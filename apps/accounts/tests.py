@@ -184,6 +184,7 @@ class DashboardTest(TestCase):
 
     def test_dashboard_scraper_status_admin_only(self):
         ScrapeJob.objects.create(
+            name="Dashboard Job",
             county=self.county, job_type="TD", target_date=date(2026, 3, 1),
         )
         self.client.login(username="admin", password="pass")

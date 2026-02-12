@@ -1,5 +1,7 @@
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any
+
+from django.db.models import Q
 
 from apps.settings_app.models import FilterCriteria
 
@@ -15,26 +17,46 @@ def evaluate_prospect(prospect_data: Dict[str, Any], county) -> Dict[str, Any]:
     if not ptype:
         return {'qualified': False, 'rule': None, 'reason': 'Missing prospect_type'}
 
+    base_qs = FilterCriteria.objects.filter(is_active=True).prefetch_related("counties")
+
+    def _matching_rules(qs):
+        for rule in qs:
+            types = rule.prospect_types or ([rule.prospect_type] if rule.prospect_type else [])
+            if types and ptype not in types:
+                continue
+            yield rule
+
     candidates = []
-    # county-specific
     if county:
-        candidates.extend(list(FilterCriteria.objects.filter(is_active=True, prospect_type=ptype, county=county)))
-    # state-wide
+        county_q = base_qs.filter(Q(counties=county) | Q(county=county)).distinct()
+        candidates.extend(_matching_rules(county_q))
     if county and county.state:
-        candidates.extend(list(FilterCriteria.objects.filter(is_active=True, prospect_type=ptype, state=county.state, county__isnull=True)))
-    # global
-    candidates.extend(list(FilterCriteria.objects.filter(is_active=True, prospect_type=ptype, state__isnull=True, county__isnull=True)))
+        state_q = base_qs.filter(
+            Q(state=county.state),
+            Q(counties__isnull=True),
+            Q(county__isnull=True),
+        ).distinct()
+        candidates.extend(_matching_rules(state_q))
+    global_q = base_qs.filter(state__isnull=True, county__isnull=True, counties__isnull=True).distinct()
+    candidates.extend(_matching_rules(global_q))
 
     # Evaluate candidates in order added (county -> state -> global)
     for rule in candidates:
-        # check min_surplus_amount
-        if rule.min_surplus_amount is not None:
-            try:
-                surplus = float(prospect_data.get('surplus_amount') or 0)
-            except Exception:
-                surplus = 0
-            if surplus < float(rule.min_surplus_amount):
-                return {'qualified': False, 'rule': rule, 'reason': f'surplus {surplus} < min {rule.min_surplus_amount}'}
+        surplus_value = prospect_data.get('surplus_amount')
+        surplus_float = None
+        try:
+            if surplus_value is not None:
+                surplus_float = float(surplus_value)
+        except Exception:
+            surplus_float = None
+
+        if rule.surplus_amount_min is not None:
+            if surplus_float is None or surplus_float < float(rule.surplus_amount_min):
+                return {'qualified': False, 'rule': rule, 'reason': 'surplus below minimum'}
+
+        if rule.surplus_amount_max is not None:
+            if surplus_float is not None and surplus_float > float(rule.surplus_amount_max):
+                return {'qualified': False, 'rule': rule, 'reason': 'surplus above maximum'}
 
         # check min_date
         if rule.min_date:
@@ -49,11 +71,16 @@ def evaluate_prospect(prospect_data: Dict[str, Any], county) -> Dict[str, Any]:
             if not adt or adt < rule.min_date:
                 return {'qualified': False, 'rule': rule, 'reason': f'auction_date {adt} < min_date {rule.min_date}'}
 
-        # If other checks (status_types, auction_types) are configured, ensure match when present
+        # If other checks are configured, ensure match when present
         if rule.status_types:
             status = prospect_data.get('auction_status')
             if status and status not in rule.status_types:
                 return {'qualified': False, 'rule': rule, 'reason': f'status {status} not in allowed {rule.status_types}'}
+
+        if rule.sold_to:
+            sold_to_value = prospect_data.get('sold_to') or ''
+            if sold_to_value.strip() != rule.sold_to.strip():
+                return {'qualified': False, 'rule': rule, 'reason': 'sold_to mismatch'}
 
         # passed checks for this rule -> qualified
         return {'qualified': True, 'rule': rule, 'reason': 'matches rule'}

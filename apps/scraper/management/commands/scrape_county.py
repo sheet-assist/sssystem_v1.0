@@ -37,15 +37,17 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR("Invalid end-date format. Use YYYY-MM-DD"))
                 return
 
+        date_desc = str(start) if not end else f"{start} to {end}"
+        job_name = f"{county.name} {options['type']} {date_desc}"
+
         job = ScrapeJob.objects.create(
+            name=job_name,
             county=county,
             job_type=options["type"],
             target_date=start,
             end_date=end,
             status="pending",
         )
-
-        date_desc = str(start) if not end else f"{start} to {end}"
         self.stdout.write(f"Running job {job.pk} for {county.name} [{date_desc}]")
 
         try:

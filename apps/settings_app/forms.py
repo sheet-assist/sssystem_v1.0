@@ -1,24 +1,56 @@
 from django import forms
 
+from apps.locations.models import County
+from apps.prospects.models import Prospect
+
 from .models import FilterCriteria
 
 
 class FilterCriteriaForm(forms.ModelForm):
+    counties = forms.ModelMultipleChoiceField(
+        queryset=County.objects.filter(is_active=True).select_related("state").order_by("state__name", "name"),
+        required=False,
+        widget=forms.SelectMultiple(
+            attrs={
+                "class": "form-select counties-select",
+                "data-select-all-target": "counties",
+                "size": 8,
+            }
+        ),
+        label="Counties",
+        help_text="Choose one or more counties that this rule applies to",
+    )
+
+    prospect_types = forms.MultipleChoiceField(
+        choices=Prospect.PROSPECT_TYPES,
+        required=False,
+        widget=forms.SelectMultiple(attrs={"class": "form-select", "size": 4}),
+        label="Document Types",
+        help_text="Select MF/TD/etc. Leave empty for all types",
+    )
+
+    status_types = forms.MultipleChoiceField(
+        choices=Prospect.AUCTION_STATUS_CHOICES,
+        required=False,
+        widget=forms.SelectMultiple(attrs={"class": "form-select", "size": 5}),
+        label="Auction Status",
+    )
+
     class Meta:
         model = FilterCriteria
         fields = [
-            "name", "prospect_type", "state", "county",
+            "name", "prospect_types", "state", "counties",
             "plaintiff_max_bid_min", "plaintiff_max_bid_max",
             "assessed_value_min", "assessed_value_max",
             "final_judgment_min", "final_judgment_max",
             "sale_amount_min", "sale_amount_max",
-            "min_date", "status_types", "auction_types", "is_active",
+            "surplus_amount_min", "surplus_amount_max",
+            "sold_to",
+            "min_date", "max_date", "status_types", "is_active",
         ]
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
-            "prospect_type": forms.Select(attrs={"class": "form-select"}),
             "state": forms.Select(attrs={"class": "form-select"}),
-            "county": forms.Select(attrs={"class": "form-select"}),
             
             # Financial Criteria
             "plaintiff_max_bid_min": forms.NumberInput(attrs={
@@ -45,14 +77,42 @@ class FilterCriteriaForm(forms.ModelForm):
             "sale_amount_max": forms.NumberInput(attrs={
                 "class": "form-control", "step": "1000",
                 "placeholder": "Max sale amount"}),
+            "surplus_amount_min": forms.NumberInput(attrs={
+                "class": "form-control", "step": "1000",
+                "placeholder": "Min surplus amount"}),
+            "surplus_amount_max": forms.NumberInput(attrs={
+                "class": "form-control", "step": "1000",
+                "placeholder": "Max surplus amount"}),
+            "sold_to": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "Exact Sold To match",
+            }),
             
             "min_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
-            "status_types": forms.Textarea(attrs={"class": "form-control", "rows": 2,
-                                                   "placeholder": '["Live", "Upcoming"]'}),
-            "auction_types": forms.Textarea(attrs={"class": "form-control", "rows": 2,
-                                                    "placeholder": '["Tax Deed"]'}),
+            "max_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["prospect_types"].initial = self.instance.prospect_types or []
+            self.fields["counties"].initial = self.instance.counties.all()
+            self.fields["status_types"].initial = self.instance.status_types
+            self.fields["min_date"].initial = self.instance.min_date
+            self.fields["max_date"].initial = self.instance.max_date
+        else:
+            self.fields["status_types"].initial = []
+            self.fields["prospect_types"].initial = []
+            self.fields["counties"].initial = []
+            self.fields["min_date"].initial = None
+            self.fields["max_date"].initial = None
+
+    def clean_prospect_types(self):
+        return self.cleaned_data.get("prospect_types") or []
+
+    def clean_status_types(self):
+        return self.cleaned_data.get("status_types") or []
     
     def clean(self):
         cleaned = super().clean()
@@ -80,5 +140,15 @@ class FilterCriteriaForm(forms.ModelForm):
         sale_max = cleaned.get('sale_amount_max')
         if sale_min and sale_max and sale_max < sale_min:
             raise forms.ValidationError("Sale Amount: Max must be >= Min.")
+
+        surplus_min = cleaned.get('surplus_amount_min')
+        surplus_max = cleaned.get('surplus_amount_max')
+        if surplus_min and surplus_max and surplus_max < surplus_min:
+            raise forms.ValidationError("Surplus Amount: Max must be >= Min.")
+
+        start_date = cleaned.get("min_date")
+        end_date = cleaned.get("max_date")
+        if start_date and end_date and end_date < start_date:
+            raise forms.ValidationError("Auction Date: End must be on or after Start.")
         
         return cleaned

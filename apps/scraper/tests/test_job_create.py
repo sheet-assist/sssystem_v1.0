@@ -56,6 +56,18 @@ class ScrapingJobModelTest(TestCase):
         self.assertIn("Broward", str(job))
         self.assertIn("pending", str(job))
 
+    def test_group_name_optional(self):
+        job = ScrapingJob.objects.create(
+            name="Grouped",
+            group_name="Batch Alpha",
+            state="FL",
+            county="Palm Beach",
+            start_date=date(2026, 4, 1),
+            end_date=date(2026, 4, 7),
+        )
+        self.assertEqual(job.group_name, "Batch Alpha")
+        self.assertIn("Batch Alpha", str(job))
+
     def test_default_ordering_newest_first(self):
         job_a = ScrapingJob.objects.create(
             name="Job A", state="FL", county="A",
@@ -204,6 +216,20 @@ class JobCreationFormTest(TestCase):
         job = form.save()
         self.assertEqual(job.county, "Miami-Dade")
 
+    def test_group_name_saved(self):
+        form = JobCreationForm(data={
+            "name": "Grouped Job",
+            "group_name": "Batch Alpha",
+            "state": self.state.pk,
+            "county": self.county.pk,
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-07",
+            "date_preset": "custom",
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+        job = form.save()
+        self.assertEqual(job.group_name, "Batch Alpha")
+
     def test_name_required(self):
         form = JobCreationForm(data={
             "state": self.state.pk,
@@ -254,6 +280,7 @@ class JobCreateViewTest(TestCase):
         """Test that POSTing valid data creates a ScrapingJob in the database."""
         self.client.post(reverse("scraper:job_create_v2"), {
             "name": "New Job",
+            "group_name": "Batch Omega",
             "state": self.state.pk,
             "county": self.county.pk,
             "start_date": "2026-03-01",
@@ -263,6 +290,7 @@ class JobCreateViewTest(TestCase):
         job = ScrapingJob.objects.first()
         self.assertIsNotNone(job)
         self.assertEqual(job.name, "New Job")
+        self.assertEqual(job.group_name, "Batch Omega")
         self.assertEqual(job.status, "pending")
         self.assertEqual(job.created_by, self.admin)
         self.assertEqual(job.state, "FL")
@@ -340,12 +368,7 @@ class JobDetailViewTest(TestCase):
 
 
 class JobListViewTest(TestCase):
-    """Test the JobListView.
-
-    NOTE: Tests that render the full template are skipped because the shared
-    list template references legacy URL names with UUID PKs. We test the
-    queryset logic directly instead.
-    """
+    """Test the JobListView and its context helpers."""
 
     def setUp(self):
         self.admin = User.objects.create_superuser(username="admin", password="pass")
@@ -406,6 +429,48 @@ class JobListViewTest(TestCase):
         qs = view.get_queryset()
         statuses = list(qs.values_list("status", flat=True))
         self.assertEqual(statuses, ["pending"])
+
+    def test_group_summary_context(self):
+        """Group summaries aggregate success/failed counts correctly."""
+        from django.test import RequestFactory
+        from apps.scraper.views import JobListView
+
+        ScrapingJob.objects.create(
+            name="Group Job 1",
+            group_name="Batch Z",
+            state="FL",
+            county="Test",
+            start_date=date(2026, 3, 1),
+            end_date=date(2026, 3, 7),
+            status="completed",
+            rows_success=25,
+        )
+        ScrapingJob.objects.create(
+            name="Group Job 2",
+            group_name="Batch Z",
+            state="FL",
+            county="Test",
+            start_date=date(2026, 3, 1),
+            end_date=date(2026, 3, 7),
+            status="failed",
+            rows_failed=5,
+        )
+
+        factory = RequestFactory()
+        request = factory.get(reverse("scraper:job_list_v2"))
+        request.user = self.admin
+        view = JobListView()
+        view.request = request
+        view.kwargs = {}
+        qs = view.get_queryset()
+        view.object_list = qs
+        ctx = view.get_context_data()
+        groups = {g["group_name"]: g for g in ctx["group_summaries"]}
+
+        self.assertIn("Batch Z", groups)
+        self.assertEqual(groups["Batch Z"]["success_count"], 25)
+        self.assertEqual(groups["Batch Z"]["failed_count"], 5)
+        self.assertEqual(groups["Batch Z"]["status"], "failed")
 
 
 class DashboardViewTest(TestCase):

@@ -5,6 +5,7 @@ import pandas as pd
 import os
 from datetime import date, timedelta
 from playwright.sync_api import sync_playwright
+import time
 
 CSV_FILE = "miami_auctions.csv"
 
@@ -28,25 +29,36 @@ LABEL_REGEX_MAP = {
 }
 
 
-def rundates(page, auction_date, base_url, state, county):
-    url = (
-        f"{base_url}/index.cfm"
-        f"?zaction=AUCTION&Zmethod=PREVIEW&AUCTIONDATE={auction_date}"
-    )
-
-    page.goto(url, wait_until="domcontentloaded", timeout=30000)
-
+def get_total_pages(page):
+    """Extract total pages from the pagination element"""
     try:
-        page.wait_for_selector(".AUCTION_ITEM", timeout=20000)
+        # Look for span with id="maxCB" which contains total pages
+        max_pages_span = page.locator("#maxCB").first
+        if max_pages_span:
+            total_text = max_pages_span.text_content(timeout=5000)
+            if total_text:
+                total_text = total_text.strip()
+                match = re.search(r'\d+', total_text)
+                if match:
+                    return int(match.group())
     except:
-        print(f"⚠ No auctions found for {auction_date}")
-        return
+        pass
+    
+    return 1
 
+
+def scrape_page(page, auction_date, base_url, state, county):
+    """Scrape auction data from current page"""
     html = page.content()
     soup = BeautifulSoup(html, "html.parser")
     auctions = soup.select(".AUCTION_ITEM")
 
     rows = []
+    
+    url = (
+        f"{base_url}/index.cfm"
+        f"?zaction=AUCTION&Zmethod=PREVIEW&AUCTIONDATE={auction_date}"
+    )
 
     for a in auctions:
         auction_id = a.get("aid", "")
@@ -60,7 +72,6 @@ def rundates(page, auction_date, base_url, state, county):
         if start_time.find("Canceled") >=0 :
             status=start_time
             start_time=""
-
 
         record = {
             "state" :state,
@@ -115,13 +126,63 @@ def rundates(page, auction_date, base_url, state, county):
                 record["Sold Amount"] = sold_amount.get_text(strip=True)
             if sold_to:
                 record["Sold To"] = sold_to.get_text(strip=True)
-        # 'else:
-            # 'record["Status"] = "Not Sold"
 
         rows.append(record)
 
-    if rows:
-        df = pd.DataFrame(rows)
+    return rows
+
+
+def rundates(page, auction_date, base_url, state, county):
+    url = (
+        f"{base_url}/index.cfm"
+        f"?zaction=AUCTION&Zmethod=PREVIEW&AUCTIONDATE={auction_date}"
+    )
+
+    page.goto(url, wait_until="domcontentloaded", timeout=30000)
+
+    try:
+        page.wait_for_selector(".AUCTION_ITEM", timeout=20000)
+    except:
+        print(f"⚠ No auctions found for {auction_date}")
+        return
+
+    total_pages = get_total_pages(page)
+    print(f"📄 Total pages for {auction_date}: {total_pages}")
+
+    all_rows = []
+    current_page = 1
+
+    while current_page <= total_pages:
+        print(f"  Scraping page {current_page}/{total_pages}...")
+        
+        rows = scrape_page(page, auction_date, base_url, state, county)
+        all_rows.extend(rows)
+
+        if current_page < total_pages:
+            # Navigate to next page using input box
+            try:
+                page_input = page.locator("#curPCB").first
+                if page_input:
+                    next_page_num = current_page + 1
+                    print(f"  Navigating to page {next_page_num} using input box...")
+                    page_input.fill(str(next_page_num))
+                    page_input.press("Enter")
+                    
+                    # Wait for page content to load
+                    page.wait_for_selector(".AUCTION_ITEM", timeout=20000)
+                    time.sleep(1)  # Small delay to ensure content is rendered
+                else:
+                    print(f"⚠ Could not find pagination input box (#curPCB)")
+                    break
+                
+            except Exception as e:
+                print(f"⚠ Error navigating to next page: {e}")
+                break
+
+        current_page += 1
+
+    if all_rows:
+        df = pd.DataFrame(all_rows)
         df.to_csv(
             CSV_FILE,
             mode="a",
@@ -129,7 +190,7 @@ def rundates(page, auction_date, base_url, state, county):
             header=not os.path.exists(CSV_FILE)
         )
 
-    print(f"✅ {len(rows)} records saved for {auction_date}")
+    print(f"✅ {len(all_rows)} total records saved for {auction_date}")
 
 
 def run_auctions(start_date, end_date, base_url, state, county):
@@ -155,5 +216,19 @@ def run_auctions(start_date, end_date, base_url, state, county):
             current_date += timedelta(days=1)
 
         browser.close()
+
+
+if __name__ == "__main__":
+    # Scrape Miami-Dade for 10/23/2025
+    base_url = "https://www.miamidade.realforeclose.com"
+    state = "FL"
+    county = "Miami-Dade"
+    start_date = date(2025, 10, 27)
+    end_date = date(2025, 10, 28)  # Exclusive, so this scrapes only 10/23
+    
+    print("🚀 Starting Miami-Dade Foreclosure Scraper...")
+    run_auctions(start_date, end_date, base_url, state, county)
+    print("✅ Scraping complete!")
+
 
 

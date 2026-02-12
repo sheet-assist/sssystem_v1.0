@@ -13,13 +13,15 @@ class Prospect(models.Model):
     ]
 
     AUCTION_STATUS_CHOICES = [
-        ("scheduled", "Scheduled"),
-        ("cancelled", "Cancelled"),
-        ("sold_third_party", "Sold Third Party"),
-        ("sold_plaintiff", "Sold Plaintiff"),
-        ("postponed", "Postponed"),
-        ("struck_off", "Struck Off"),
+        ("Canceled per Bankruptcy", "Canceled per Bankruptcy"),
+        ("Canceled per County", "Canceled per County"),
+        ("Canceled per Order", "Canceled per Order"),
+        ("Other", "Other"),
+        ("Redeemed", "Redeemed"),
+        ("Sold", "Sold"),
+        
     ]
+   
 
     QUALIFICATION_STATUS = [
         ("pending", "Pending"),
@@ -167,6 +169,45 @@ class ProspectEmail(models.Model):
         return f"Email: {self.subject} re: {self.prospect.case_number}"
 
 
+class ProspectRuleNote(models.Model):
+    SOURCE_CHOICES = [
+        ("rule", "Rule"),
+        ("scraper", "Scraper"),
+        ("manual", "Manual"),
+    ]
+    DECISION_CHOICES = [
+        ("qualified", "Qualified"),
+        ("disqualified", "Disqualified"),
+    ]
+
+    prospect = models.ForeignKey(Prospect, on_delete=models.CASCADE, related_name="rule_notes")
+    note = models.TextField()
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_rule_notes",
+    )
+    rule = models.ForeignKey(
+        "settings_app.FilterCriteria",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rule_notes",
+    )
+    rule_name = models.CharField(max_length=255, blank=True, default="")
+    source = models.CharField(max_length=32, choices=SOURCE_CHOICES, default="rule")
+    decision = models.CharField(max_length=32, choices=DECISION_CHOICES, default="disqualified")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Rule note for {self.prospect.case_number} ({self.created_at:%Y-%m-%d %H:%M})"
+
+
 def log_prospect_action(prospect, user, action_type, description="", metadata=None):
     """Utility to log a prospect action."""
     return ProspectActionLog.objects.create(
@@ -175,4 +216,38 @@ def log_prospect_action(prospect, user, action_type, description="", metadata=No
         action_type=action_type,
         description=description,
         metadata=metadata or {},
+    )
+
+
+def add_rule_note(
+    prospect,
+    note="",
+    *,
+    reasons=None,
+    created_by=None,
+    rule=None,
+    rule_name="",
+    source="rule",
+    decision="disqualified",
+):
+    """Record a rule evaluation note capturing pass/fail context."""
+    content = (note or "").strip()
+    resolved_rule_name = rule_name or (getattr(rule, "name", "") or "")
+    reason_lines = [reason for reason in (reasons or []) if reason]
+    if decision == "qualified":
+        qualifier_line = f"Qualified the Rule : {resolved_rule_name or 'Unknown Rule'}"
+        content = f"{content}\n\n{qualifier_line}" if content else qualifier_line
+    elif decision == "disqualified" and reason_lines:
+        details_block = "Failed criteria:\n" + "\n".join(f"- {reason}" for reason in reason_lines)
+        content = f"{content}\n\n{details_block}" if content else details_block
+    if not content:
+        content = "Prospect qualified." if decision == "qualified" else "Prospect disqualified."
+    return ProspectRuleNote.objects.create(
+        prospect=prospect,
+        note=content,
+        created_by=created_by,
+        rule=rule,
+        rule_name=resolved_rule_name,
+        source=source,
+        decision=decision,
     )

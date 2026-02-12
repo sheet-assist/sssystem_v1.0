@@ -11,14 +11,14 @@ from .models import (
 
 @admin.register(ScrapingJob)
 class ScrapingJobAdmin(admin.ModelAdmin):
-    list_display = ('name', 'state', 'county', 'status', 'rows_success', 'created_at', 'created_by')
-    list_filter = ('status', 'created_at', 'state', 'created_by')
-    search_fields = ('name', 'county', 'created_by__username')
+    list_display = ('name', 'group_name', 'state', 'county', 'status', 'rows_success', 'created_at', 'created_by')
+    list_filter = ('status', 'created_at', 'state', 'group_name', 'created_by')
+    search_fields = ('name', 'group_name', 'county', 'created_by__username')
     readonly_fields = ('created_at', 'updated_at', 'task_id', 'id')
     
     fieldsets = (
         ('Basic Info', {
-            'fields': ('id', 'name', 'state', 'county', 'status', 'created_by')
+            'fields': ('id', 'name', 'group_name', 'state', 'county', 'status', 'created_by')
         }),
         ('Date Range', {
             'fields': ('start_date', 'end_date')
@@ -139,9 +139,9 @@ class UserJobDefaultsAdmin(admin.ModelAdmin):
 
 @admin.register(ScrapeJob)
 class ScrapeJobAdmin(admin.ModelAdmin):
-    list_display = ('county', 'job_type', 'target_date', 'status', 'prospects_created', 'created_at')
+    list_display = ('name', 'county', 'job_type', 'target_date', 'status', 'prospects_created', 'created_at')
     list_filter = ('status', 'job_type', 'created_at')
-    search_fields = ('county__name',)
+    search_fields = ('name', 'county__name')
     readonly_fields = ('created_at', 'started_at', 'completed_at')
 
 

@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView, View
 from django.utils import timezone
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Sum, Max, Min
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
@@ -72,7 +72,7 @@ class DashboardView(AdminRequiredMixin, TemplateView):
 class JobListView(AdminRequiredMixin, ListView):
     """List all scraping jobs with filtering"""
     model = ScrapingJob
-    template_name = "scraper/job_list.html"
+    template_name = "scraper/job_list_v2.html"
     paginate_by = 20
     context_object_name = 'jobs'
     
@@ -96,12 +96,48 @@ class JobListView(AdminRequiredMixin, ListView):
                 end_date = form.cleaned_data['date_range_end'] + timedelta(days=1)
                 qs = qs.filter(created_at__lt=end_date)
         
+        self.filtered_queryset = qs
         return qs
     
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx['filter_form'] = JobFilterForm(self.request.GET or None)
+        ctx['group_summaries'] = self.get_group_summaries()
         return ctx
+
+    def get_group_summaries(self):
+        qs = getattr(self, 'filtered_queryset', ScrapingJob.objects.none())
+
+        summary = list(qs.values('group_name').annotate(
+            total=Count('id'),
+            running_jobs=Count('id', filter=Q(status='running')),
+            failed_jobs=Count('id', filter=Q(status='failed')),
+            completed_jobs=Count('id', filter=Q(status='completed')),
+            pending_jobs=Count('id', filter=Q(status='pending')),
+            success_rows=Sum('rows_success'),
+            failed_rows=Sum('rows_failed'),
+        ).order_by('group_name'))
+
+        summaries = []
+        for entry in summary:
+            if entry['running_jobs'] > 0:
+                status = 'running'
+            elif entry['failed_jobs'] > 0:
+                status = 'failed'
+            elif entry['completed_jobs'] == entry['total'] and entry['total'] > 0:
+                status = 'completed'
+            else:
+                status = 'pending'
+
+            summaries.append({
+                'group_name': entry['group_name'] or 'Ungrouped',
+                'status': status,
+                'success_count': entry['success_rows'] or 0,
+                'failed_count': entry['failed_rows'] or 0,
+                'total_jobs': entry['total'],
+            })
+
+        return summaries
 
 
 class JobDetailView(AdminRequiredMixin, DetailView):
@@ -475,13 +511,50 @@ class ScrapeJobListView(AdminRequiredMixin, ListView):
         status = self.request.GET.get("status")
         if status:
             qs = qs.filter(status=status)
+        self.filtered_queryset = qs
         return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["statuses"] = ScrapeJob.JOB_STATUS
         ctx["current_status"] = self.request.GET.get("status", "")
+        ctx["grouped_jobs"] = self.get_grouped_jobs()
         return ctx
+
+    def get_grouped_jobs(self):
+        qs = getattr(self, "filtered_queryset", ScrapeJob.objects.none())
+        aggregated = qs.values("name").annotate(
+            total_jobs=Count("id"),
+            success_count=Count("id", filter=Q(status="completed")),
+            failed_count=Count("id", filter=Q(status="failed")),
+            running_count=Count("id", filter=Q(status="running")),
+            pending_count=Count("id", filter=Q(status="pending")),
+            latest_created=Max("created_at"),
+            sample_job_id=Min("id"),
+        ).order_by("name")
+
+        grouped = []
+        for entry in aggregated:
+            if entry["running_count"]:
+                status = "running"
+            elif entry["failed_count"]:
+                status = "failed"
+            elif entry["success_count"] == entry["total_jobs"] and entry["total_jobs"] > 0:
+                status = "completed"
+            else:
+                status = "pending"
+
+            grouped.append({
+                "name": entry["name"] or "Untitled Job",
+                "status": status,
+                "success_count": entry["success_count"],
+                "failed_count": entry["failed_count"],
+                "total_jobs": entry["total_jobs"],
+                "latest_created": entry["latest_created"],
+                "job_pk": entry["sample_job_id"],
+            })
+
+        return grouped
 
 
 class ScrapeJobCreateView(AdminRequiredMixin, CreateView):
@@ -490,14 +563,54 @@ class ScrapeJobCreateView(AdminRequiredMixin, CreateView):
     template_name = "scraper/job_create.html"
 
     def form_valid(self, form):
-        form.instance.triggered_by = self.request.user
-        form.instance.status = "pending"
-        resp = super().form_valid(form)
-        messages.success(self.request, f"Scrape job #{self.object.pk} created.")
-        return resp
+        jobs = form.save_multiple(triggered_by=self.request.user)
+
+        if len(jobs) == 1:
+            job = jobs[0]
+            messages.success(self.request, f"Scrape job #{job.pk} created.")
+            return redirect("scraper:job_detail", pk=job.pk)
+
+        messages.success(self.request, f"{len(jobs)} scrape jobs created.")
+        return redirect("scraper:job_list")
 
     def get_success_url(self):
         return reverse("scraper:job_detail", kwargs={"pk": self.object.pk})
+
+
+class ScrapeJobGroupDetailView(AdminRequiredMixin, TemplateView):
+    template_name = "scraper/job_group_detail.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.anchor_job = get_object_or_404(ScrapeJob, pk=kwargs.get("pk"))
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        group_name = self.anchor_job.name
+
+        jobs = ScrapeJob.objects.filter(name=group_name).select_related(
+            "county",
+            "county__state",
+            "triggered_by",
+        ).order_by("county__name", "pk")
+        first_job = jobs.first()
+
+        summary = jobs.aggregate(
+            total_jobs=Count("id"),
+            success_count=Count("id", filter=Q(status="completed")),
+            failed_count=Count("id", filter=Q(status="failed")),
+            running_count=Count("id", filter=Q(status="running")),
+            pending_count=Count("id", filter=Q(status="pending")),
+            prospects_total=Sum("prospects_created"),
+        )
+
+        ctx.update({
+            "group_name": group_name or "Untitled Job",
+            "jobs": jobs,
+            "first_job": first_job,
+            "summary": summary,
+        })
+        return ctx
 
 
 class ScrapeJobDetailView(AdminRequiredMixin, DetailView):

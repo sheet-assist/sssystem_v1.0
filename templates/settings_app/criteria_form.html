@@ -2,31 +2,258 @@
 
 {% block title %}{% if form.instance.pk %}Edit{% else %}Add{% endif %} Filter Rule{% endblock %}
 
-{% block content %}
-<h2>{% if form.instance.pk %}Edit{% else %}Add{% endif %} Filter Rule</h2>
+{% block extra_css %}
+<style>
+.criteria-card {
+  border-radius: 1rem;
+  border: none;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+.criteria-card h5 {
+  letter-spacing: 0.03em;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: #6c757d;
+}
+.select-actions .btn {
+  font-size: 0.75rem;
+}
+</style>
+{% endblock %}
 
-<div class="card mt-3" style="max-width: 700px;">
-  <div class="card-body">
-    <form method="post">
+{% block content %}
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <p class="text-uppercase text-muted mb-1 small">Filter criteria</p>
+    <h2 class="fw-semibold mb-0">{% if form.instance.pk %}Edit{% else %}Create{% endif %} Smart Rule</h2>
+  </div>
+  <div class="d-flex gap-2 align-items-center">
+    {% if form.instance.pk %}
+    <form method="post" action="{% url 'settings_app:criteria_apply' form.instance.pk %}" class="d-inline"
+      onsubmit="return confirm('Apply this rule to all matching prospects now? This may take a moment.');">
       {% csrf_token %}
-      {% for field in form %}
-      <div class="mb-3">
-        {% if field.field.widget.input_type == 'checkbox' %}
-        <div class="form-check">
-          {{ field }}
-          <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-        </div>
-        {% else %}
-        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-        {{ field }}
-        {% endif %}
-        {% if field.help_text %}<small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
-        {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
-      </div>
-      {% endfor %}
-      <button type="submit" class="btn btn-primary">Save</button>
-      <a href="{% url 'settings_app:criteria_list' %}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-warning btn-sm">
+        <i class="bi bi-lightning-charge me-1"></i>Apply Now
+      </button>
     </form>
+    {% endif %}
+    <a href="{% url 'settings_app:criteria_list' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back to list
+    </a>
   </div>
 </div>
+
+<form method="post" class="mt-4">
+  {% csrf_token %}
+
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <div class="card criteria-card h-100">
+        <div class="card-body">
+          <h5 class="mb-3">Filter Criteria</h5>
+          <div class="mb-3">
+            <label for="{{ form.name.id_for_label }}" class="form-label">{{ form.name.label }}</label>
+            {{ form.name }}
+            {% for error in form.name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ form.state.label }}</label>
+            {{ form.state }}
+            {% for error in form.state.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="mb-1 d-flex justify-content-between align-items-center select-actions">
+            <label class="form-label mb-0">{{ form.counties.label }}</label>
+            <div>
+              <button class="btn btn-outline-primary btn-sm" type="button" data-select-all="counties">Select All</button>
+              <button class="btn btn-outline-secondary btn-sm" type="button" data-clear-all="counties">Clear</button>
+            </div>
+          </div>
+          {{ form.counties }}
+          <small class="text-muted">{{ form.counties.help_text }}</small>
+          {% for error in form.counties.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+
+          <div class="mt-3 mb-3">
+            <label class="form-label">{{ form.prospect_types.label }}</label>
+            {{ form.prospect_types }}
+            <small class="text-muted">{{ form.prospect_types.help_text }}</small>
+            {% for error in form.prospect_types.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <label class="form-label mb-0">Auction Date Range</label>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="fill-this-month">This Month</button>
+            </div>
+            <div class="row g-2">
+              <div class="col-6">
+                <small class="text-muted d-block">From</small>
+                <div class="input-group input-group-sm">
+                  {{ form.min_date }}
+                  <button type="button" class="btn btn-outline-secondary clear-date-btn" data-target="id_min_date" title="Clear date" aria-label="Clear from date">
+                    <i class="bi bi-x-circle"></i>
+                  </button>
+                </div>
+                {% for error in form.min_date.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-6">
+                <small class="text-muted d-block">To</small>
+                <div class="input-group input-group-sm">
+                  {{ form.max_date }}
+                  <button type="button" class="btn btn-outline-secondary clear-date-btn" data-target="id_max_date" title="Clear date" aria-label="Clear to date">
+                    <i class="bi bi-x-circle"></i>
+                  </button>
+                </div>
+                {% for error in form.max_date.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+              </div>
+            </div>
+            <small class="text-muted">Leave blank for open-ended range.</small>
+          </div>
+
+          <div class="form-check mt-2">
+            {{ form.is_active }}
+            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+          </div>
+          {% for error in form.is_active.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card criteria-card h-100">
+        <div class="card-body">
+          <h5 class="mb-3">Qualification Criteria</h5>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">{{ form.plaintiff_max_bid_min.label }}</label>
+              {{ form.plaintiff_max_bid_min }}
+              {% for error in form.plaintiff_max_bid_min.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">{{ form.plaintiff_max_bid_max.label }}</label>
+              {{ form.plaintiff_max_bid_max }}
+              {% for error in form.plaintiff_max_bid_max.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">{{ form.assessed_value_min.label }}</label>
+              {{ form.assessed_value_min }}
+              {% for error in form.assessed_value_min.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">{{ form.assessed_value_max.label }}</label>
+              {{ form.assessed_value_max }}
+              {% for error in form.assessed_value_max.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">{{ form.final_judgment_min.label }}</label>
+              {{ form.final_judgment_min }}
+              {% for error in form.final_judgment_min.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">{{ form.final_judgment_max.label }}</label>
+              {{ form.final_judgment_max }}
+              {% for error in form.final_judgment_max.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">{{ form.sale_amount_min.label }}</label>
+              {{ form.sale_amount_min }}
+              {% for error in form.sale_amount_min.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">{{ form.sale_amount_max.label }}</label>
+              {{ form.sale_amount_max }}
+              {% for error in form.sale_amount_max.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">{{ form.surplus_amount_min.label }}</label>
+              {{ form.surplus_amount_min }}
+              {% for error in form.surplus_amount_min.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">{{ form.surplus_amount_max.label }}</label>
+              {{ form.surplus_amount_max }}
+              {% for error in form.surplus_amount_max.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="form-label">{{ form.sold_to.label }}</label>
+            {{ form.sold_to }}
+            {% for error in form.sold_to.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="mt-3">
+            <label class="form-label">{{ form.status_types.label }}</label>
+            {{ form.status_types }}
+            {% for error in form.status_types.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2 mt-4">
+    <button type="submit" class="btn btn-primary px-4">
+      <i class="bi bi-check2 me-1"></i>Save Rule
+    </button>
+    <a href="{% url 'settings_app:criteria_list' %}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function(){
+    const selectAllBtns = document.querySelectorAll('[data-select-all]');
+    selectAllBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = document.querySelector(`select.${btn.dataset.selectAll}-select`);
+        if (!target) { return; }
+        Array.from(target.options).forEach(opt => opt.selected = true);
+        target.dispatchEvent(new Event('change'));
+      });
+    });
+    const clearBtns = document.querySelectorAll('[data-clear-all]');
+    clearBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = document.querySelector(`select.${btn.dataset.clearAll}-select`);
+        if (!target) { return; }
+        Array.from(target.options).forEach(opt => opt.selected = false);
+        target.dispatchEvent(new Event('change'));
+      });
+    });
+
+    const thisMonthBtn = document.getElementById('fill-this-month');
+    if (thisMonthBtn) {
+      thisMonthBtn.addEventListener('click', () => {
+        const startInput = document.getElementById('id_min_date');
+        const endInput = document.getElementById('id_max_date');
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const format = (dateObj) => {
+          const year = dateObj.getFullYear();
+          const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+          const day = String(dateObj.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+        if (startInput) { startInput.value = format(start); }
+        if (endInput) { endInput.value = format(end); }
+      });
+    }
+
+    const clearDateBtns = document.querySelectorAll('.clear-date-btn');
+    clearDateBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.getAttribute('data-target');
+        const input = document.getElementById(targetId);
+        if (input) {
+          input.value = '';
+          input.dispatchEvent(new Event('change'));
+        }
+      });
+    });
+  })();
+</script>
 {% endblock %}

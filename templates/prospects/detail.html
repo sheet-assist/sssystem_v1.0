@@ -12,7 +12,10 @@
 </nav>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h2 class="mb-0">{{ object.case_number }}</h2>
+  <div>
+    <h2 class="mb-0">{{ object.case_number }}</h2>
+    <div class="text-muted small">Type: {{ object.get_prospect_type_display }}</div>
+  </div>
   <span class="badge fs-6
     {% if object.workflow_status == 'new' %}bg-secondary
     {% elif object.workflow_status == 'assigned' %}bg-primary
@@ -44,6 +47,19 @@
   <a href="{% url 'prospects:history' object.pk %}" class="btn btn-outline-dark btn-sm me-1">
     <i class="bi bi-clock-history"></i> History
   </a>
+  {% if user.profile.is_admin %}
+  <button
+    type="button"
+    class="btn btn-outline-danger btn-sm me-1"
+    data-bs-toggle="modal"
+    data-bs-target="#confirmDeleteProspectModal"
+    data-delete-url="{% url 'prospects:delete' object.pk %}"
+    data-case-number="{{ object.case_number }}"
+    data-next-url="{% url 'prospects:list_by_type' object.prospect_type %}"
+  >
+    <i class="bi bi-trash"></i> Delete
+  </button>
+  {% endif %}
   {% if object.workflow_status == 'contract_sent' or object.workflow_status == 'converted' %}
   <a href="{% url 'cases:convert' object.pk %}" class="btn btn-success btn-sm">
     <i class="bi bi-box-arrow-in-right"></i> Convert to Case
@@ -105,6 +121,7 @@
             <p class="mb-1"><strong>Assessed Value:</strong> {% if object.assessed_value %}${{ object.assessed_value|floatformat:2 }}{% else %}-{% endif %}</p>
             <p class="mb-1"><strong>Surplus:</strong> {% if object.surplus_amount %}${{ object.surplus_amount|floatformat:2 }}{% else %}-{% endif %}</p>
             <p class="mb-1"><strong>Sale Amount:</strong> {% if object.sale_amount %}${{ object.sale_amount|floatformat:2 }}{% else %}-{% endif %}</p>
+            <p class="mb-1"><strong>Sold To:</strong> {{ object.sold_to|default:"-" }}</p>
           </div>
         </div>
       </div>
@@ -191,6 +208,48 @@
       </div>
     </div>
 
+    {# Latest Rule Note Card #}
+    {% with latest_note=object.rule_notes.first %}
+    <div class="card mb-3">
+      <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-exclamation-octagon me-1"></i> Latest Rule Note</span>
+        {% if latest_note and latest_note.rule %}
+        <a href="{% url 'settings_app:criteria_edit' latest_note.rule.pk %}"
+           class="btn btn-outline-primary btn-sm"
+           target="_blank" rel="noopener">
+          <i class="bi bi-box-arrow-up-right"></i> View Rule
+        </a>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if latest_note %}
+        <div class="border-start border-3 border-danger ps-3">
+          <div class="d-flex justify-content-between flex-wrap gap-2">
+            <div>
+              {% if latest_note.rule %}
+              <a href="{% url 'settings_app:criteria_edit' latest_note.rule.pk %}"
+                 class="fw-semibold text-decoration-none"
+                 target="_blank" rel="noopener">
+                {{ latest_note.rule_name|default:latest_note.rule.name }}
+              </a>
+              {% else %}
+              <strong>{{ latest_note.rule_name|default:"Rule" }}</strong>
+              {% endif %}
+              <span class="badge bg-light text-dark border text-uppercase small ms-2">{{ latest_note.get_source_display }}</span>
+              <span class="badge {% if latest_note.decision == 'qualified' %}bg-success{% else %}bg-danger{% endif %} ms-2">{{ latest_note.get_decision_display }}</span>
+            </div>
+            <small class="text-muted fw-semibold">{{ latest_note.created_at|date:"m/d/Y H:i" }}</small>
+          </div>
+          <p class="mb-2 mt-2 small">{{ latest_note.note|linebreaksbr }}</p>
+          <small class="text-muted d-block">By {% if latest_note.created_by %}{{ latest_note.created_by.get_full_name|default:latest_note.created_by.username }}{% else %}System{% endif %}</small>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No rule notes yet.</p>
+        {% endif %}
+      </div>
+    </div>
+    {% endwith %}
+
     {# Research Card #}
     <div class="card mb-3">
       <div class="card-header fw-semibold"><i class="bi bi-clipboard-check me-1"></i> Research</div>
@@ -230,6 +289,56 @@
   </div>
 </div>
 
+{% if user.profile.is_admin %}
+<div class="modal fade" id="confirmDeleteProspectModal" tabindex="-1" aria-labelledby="confirmDeleteProspectModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmDeleteProspectModalLabel">Confirm Delete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Delete prospect <strong id="deleteProspectCaseRef">{{ object.case_number }}</strong>? This action cannot be undone.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <form id="deleteProspectForm" method="post" action="{% url 'prospects:delete' object.pk %}" class="d-inline">
+          {% csrf_token %}
+          <input type="hidden" name="next" id="deleteProspectNext" value="{% url 'prospects:list_by_type' object.prospect_type %}">
+          <button type="submit" class="btn btn-danger btn-sm">
+            <i class="bi bi-trash"></i> Delete
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const modal = document.getElementById("confirmDeleteProspectModal");
+    if (!modal) return;
+
+    modal.addEventListener("show.bs.modal", function (event) {
+      const trigger = event.relatedTarget;
+      if (!trigger) return;
+
+      const action = trigger.getAttribute("data-delete-url") || "";
+      const caseNumber = trigger.getAttribute("data-case-number") || "-";
+      const nextUrl = trigger.getAttribute("data-next-url") || "";
+
+      const form = document.getElementById("deleteProspectForm");
+      const caseRef = document.getElementById("deleteProspectCaseRef");
+      const nextInput = document.getElementById("deleteProspectNext");
+
+      if (form) form.setAttribute("action", action);
+      if (caseRef) caseRef.textContent = caseNumber;
+      if (nextInput) nextInput.value = nextUrl;
+    });
+  });
+</script>
+{% endif %}
+
 {# Recent Activity #}
 <div class="card mt-3">
   <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
@@ -240,7 +349,6 @@
     <table class="table table-sm mb-0">
       <tbody>
         {% for log in object.action_logs.all|slice:":5" %}
-        <tr>
           <td class="text-muted" style="width:160px;">{{ log.created_at|date:"m/d/Y H:i" }}</td>
           <td><span class="badge bg-secondary">{{ log.get_action_type_display }}</span></td>
           <td>{{ log.description|default:"-" }}</td>
@@ -253,4 +361,53 @@
     </table>
   </div>
 </div>
+
+{# Rule Notes Table #}
+<div class="card mt-3">
+  <div class="card-header fw-semibold">
+    <span><i class="bi bi-exclamation-octagon me-1"></i> Rule Notes</span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead>
+        <tr>
+          <th style="width:160px;">Date</th>
+          <th style="width:140px;">Rule</th>
+          <th style="width:120px;">Result</th>
+          <th>Note</th>
+          <th style="width:130px;">Source</th>
+          <th class="text-end" style="width:170px;">By</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for note in object.rule_notes.all %}
+        <tr>
+          <td class="text-muted">{{ note.created_at|date:"m/d/Y H:i" }}</td>
+          <td>
+            {% if note.rule %}
+            <a href="{% url 'settings_app:criteria_edit' note.rule.pk %}"
+               class="btn btn-outline-primary btn-sm w-100"
+               target="_blank" rel="noopener">
+              <i class="bi bi-box-arrow-up-right"></i>
+              {{ note.rule_name|default:note.rule.name }}
+            </a>
+            {% else %}
+            <span class="text-muted fw-semibold">{{ note.rule_name|default:"Rule" }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge {% if note.decision == 'qualified' %}bg-success{% else %}bg-danger{% endif %}">{{ note.get_decision_display }}</span>
+          </td>
+          <td>{{ note.note|default:"-" }}</td>
+          <td><span class="badge bg-light text-dark border text-uppercase">{{ note.get_source_display }}</span></td>
+          <td class="text-end text-muted">{% if note.created_by %}{{ note.created_by.get_full_name|default:note.created_by.username }}{% else %}System{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td class="text-center text-muted py-3" colspan="6">No rule notes yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endblock %}
+

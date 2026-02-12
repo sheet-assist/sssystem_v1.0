@@ -26,42 +26,52 @@
   </div>
 </div>
 
-<div class="table-responsive">
-  <table class="table table-hover table-sm">
-    <thead class="table-dark">
-      <tr>
-        <th>County</th>
-        <th>Type</th>
-        <th>Date(s)</th>
-        <th>Status</th>
-        <th>Created</th>
-        <th>Updated</th>
-        <th>Qualified</th>
-        <th>By</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for job in object_list %}
-      <tr style="cursor: pointer;" onclick="window.location='{% url 'scraper:job_detail' job.pk %}'">
-        <td>{{ job.county.name }}</td>
-        <td>{{ job.get_job_type_display }}</td>
-        <td>{{ job.target_date }}{% if job.end_date %} &rarr; {{ job.end_date }}{% endif %}</td>
-        <td>
-          {% if job.status == "completed" %}<span class="badge bg-success">Completed</span>
-          {% elif job.status == "running" %}<span class="badge bg-warning text-dark">Running</span>
-          {% elif job.status == "failed" %}<span class="badge bg-danger">Failed</span>
-          {% else %}<span class="badge bg-secondary">Pending</span>{% endif %}
-        </td>
-        <td>+{{ job.prospects_created }}</td>
-        <td>~{{ job.prospects_updated }}</td>
-        <td>{{ job.prospects_qualified }}</td>
-        <td>{{ job.triggered_by.username|default:"-" }}</td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="8" class="text-center text-muted">No jobs found.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>Job Name</th>
+          <th>Status</th>
+          <th class="text-end">Success Count</th>
+          <th class="text-end">Failed Count</th>
+          <th class="text-end">Runs</th>
+          <th>Last Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if grouped_jobs %}
+          {% for group in grouped_jobs %}
+          <tr>
+            <td class="fw-semibold">{{ group.name }}</td>
+            <td>
+              {% if group.status == "completed" %}
+                <span class="badge bg-success">Completed</span>
+              {% elif group.status == "running" %}
+                <span class="badge bg-warning text-dark">Running</span>
+              {% elif group.status == "failed" %}
+                <span class="badge bg-danger">Failed</span>
+              {% else %}
+                <span class="badge bg-secondary">Pending</span>
+              {% endif %}
+            </td>
+            <td class="text-end">{{ group.success_count }}</td>
+            <td class="text-end">{{ group.failed_count }}</td>
+            <td class="text-end">{{ group.total_jobs }}</td>
+            <td>{{ group.latest_created|date:"Y-m-d H:i" }}</td>
+            <td class="text-end">
+              {% if group.job_pk %}
+              <a href="{% url 'scraper:job_group_detail' group.job_pk %}" class="btn btn-sm btn-outline-primary">View Jobs</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-4">No jobs found.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
 </div>
-{% include "includes/pagination.html" %}
 {% endblock %}

@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import Prospect, ProspectActionLog, ProspectEmail, ProspectNote
+from .models import (
+    Prospect,
+    ProspectActionLog,
+    ProspectEmail,
+    ProspectNote,
+    ProspectRuleNote,
+)
 
 
 @admin.register(Prospect)
@@ -25,3 +31,10 @@ class ProspectActionLogAdmin(admin.ModelAdmin):
 @admin.register(ProspectEmail)
 class ProspectEmailAdmin(admin.ModelAdmin):
     list_display = ("prospect", "sender", "subject", "sent_at")
+
+
+@admin.register(ProspectRuleNote)
+class ProspectRuleNoteAdmin(admin.ModelAdmin):
+    list_display = ("prospect", "rule_name", "decision", "source", "created_by", "created_at")
+    list_filter = ("source", "decision")
+    search_fields = ("prospect__case_number", "note", "rule_name")

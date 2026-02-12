@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Calendar{% endblock %}
+
+{% block extra_css %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&display=swap');
+
+.calendar-hero {
+  background: radial-gradient(circle at top left, rgba(84, 112, 255, 0.35), rgba(15, 15, 30, 0.9));
+  border-radius: 1.25rem;
+  padding: 1.5rem 1.75rem;
+  color: #f8f9ff;
+  font-family: 'Space Grotesk', var(--bs-font-sans-serif);
+}
+.calendar-hero h1 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.calendar-hero .stat-pill {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.9rem;
+}
+.calendar-grid thead th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid #adb5bd;
+  color: #6c757d;
+  padding: 0.35rem;
+  width: 14.2857%;
+  background-color: #e9ecef;
+}
+.calendar-grid td {
+  height: 86px;
+  vertical-align: top;
+  padding: 0.35rem;
+  border: 1px solid #adb5bd;
+  background-color: #fff;
+  width: 14.2857%;
+}
+.calendar-grid {
+  table-layout: fixed;
+  width: 100%;
+}
+.calendar-grid td.calendar-muted {
+  background-color: #f5f6f8;
+  color: #adb5bd;
+}
+.calendar-grid td.calendar-empty {
+  background-color: #f5f6f8;
+}
+.calendar-grid td.calendar-qualified-zero {
+  background-color: #fdecec;
+}
+.calendar-grid td.calendar-qualified-positive {
+  background-color: #eaf8ee;
+}
+.calendar-grid .date-chip {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.calendar-grid .count-sep {
+  font-size: 0.78rem;
+  color: #6c757d;
+  margin: 0 0.1rem;
+}
+.calendar-grid .count-btn {
+  padding: 0.1rem 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: none;
+  line-height: 1.2;
+}
+.calendar-grid .count-btn:hover {
+  text-decoration: none;
+}
+@media (max-width: 992px) {
+  .calendar-grid td {
+    height: auto;
+    min-height: 70px;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="calendar-hero mb-3">
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
+    <div>
+      <p class="stat-pill mb-2">Qualified {{ month_qualified_total }}/{{ total_events }}</p>
+      <h1 class="mb-1">{{ current_month|date:"F Y" }}</h1>
+      <p class="mb-0 text-white-50">Click a day count to open the prospects list for that date.</p>
+    </div>
+    <div class="text-lg-end">
+      <a class="btn btn-outline-light btn-sm" href="?{{ today_query }}">
+        <i class="bi bi-arrow-counterclockwise me-1"></i> Jump to Today
+      </a>
+    </div>
+  </div>
+</section>
+
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+      <a class="btn btn-outline-secondary btn-sm" href="?{{ prev_query }}">
+        <i class="bi bi-chevron-left"></i> {{ prev_month|date:"F" }}
+      </a>
+      <div class="text-center">
+        <div class="fw-semibold text-uppercase text-muted" style="font-size:0.75rem;">{{ current_month|date:"Y" }}</div>
+        <div class="fs-5 fw-semibold">{{ current_month|date:"F" }}</div>
+      </div>
+      <a class="btn btn-outline-secondary btn-sm" href="?{{ next_query }}">
+        {{ next_month|date:"F" }} <i class="bi bi-chevron-right"></i>
+      </a>
+    </div>
+
+    <form method="get" class="row g-2 align-items-end">
+      <input type="hidden" name="year" value="{{ current_month|date:"Y" }}">
+      <input type="hidden" name="month" value="{{ current_month|date:"n" }}">
+      <div class="col-sm-4 col-md-3">
+        <label class="form-label small text-uppercase">Type Filter</label>
+        <select name="type" class="form-select form-select-sm">
+          <option value="">All Types</option>
+          {% for value, label in type_choices %}
+            <option value="{{ value }}" {% if selected_type == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4 col-md-3">
+        <label class="form-label small text-uppercase">State</label>
+        <select name="state" class="form-select form-select-sm">
+          <option value="">All States</option>
+          {% for state in state_choices %}
+            <option value="{{ state.abbreviation }}" {% if selected_state == state.abbreviation %}selected{% endif %}>
+              {{ state.abbreviation }} - {{ state.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4 col-md-3">
+        <label class="form-label small text-uppercase">County</label>
+        <select name="county" class="form-select form-select-sm">
+          <option value="">All Counties</option>
+          {% for county in county_choices %}
+            <option value="{{ county.slug }}" {% if selected_county == county.slug %}selected{% endif %}>
+              {{ county.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4 col-md-3">
+        <button type="submit" class="btn btn-primary btn-sm w-100">
+          <i class="bi bi-funnel me-1"></i> Apply Filter
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="table-responsive">
+  <table class="table calendar-grid mb-0">
+    <thead>
+      <tr>
+        {% for weekday in weekdays %}
+          <th class="text-center">{{ weekday|slice:":3" }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for week in weeks %}
+        <tr>
+          {% for day in week %}
+            <td class="{% if not day.in_month %}calendar-muted{% endif %} {% if day.total_count == 0 %}calendar-empty{% elif day.qualified_count == 0 %}calendar-qualified-zero{% else %}calendar-qualified-positive{% endif %}">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="date-chip">{{ day.date|date:"j" }}</span>
+                {% if day.date == today %}<span class="badge bg-dark text-uppercase" style="font-size:0.55rem;">Today</span>{% endif %}
+              </div>
+              {% if day.total_count > 0 %}
+              <a href="{{ day.qualified_url }}" class="btn btn-success btn-sm count-btn">{{ day.qualified_count }}</a>
+              <span class="count-sep">/</span>
+              <a href="{{ day.total_url }}" class="btn btn-primary btn-sm count-btn">{{ day.total_count }}</a>
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

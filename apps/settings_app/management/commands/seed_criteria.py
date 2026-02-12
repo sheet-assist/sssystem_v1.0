@@ -18,14 +18,12 @@ class Command(BaseCommand):
 
         _, created = FilterCriteria.objects.get_or_create(
             name="Florida TD Default",
+            state=fl,
             defaults={
-                "prospect_type": "TD",
-                "state": fl,
-                "county": None,
-                "min_surplus_amount": Decimal("10000"),
+                "prospect_types": ["TD"],
+                "surplus_amount_min": Decimal("10000"),
                 "min_date": date(2024, 1, 1),
                 "status_types": ["Live", "Upcoming"],
-                "auction_types": [],
                 "is_active": True,
             },
         )

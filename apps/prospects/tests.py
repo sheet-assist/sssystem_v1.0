@@ -5,7 +5,15 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 
 from apps.locations.models import County, State
-from apps.prospects.models import Prospect, ProspectActionLog, ProspectNote, log_prospect_action
+from apps.prospects.models import (
+    Prospect,
+    ProspectActionLog,
+    ProspectNote,
+    ProspectRuleNote,
+    add_rule_note,
+    log_prospect_action,
+)
+from apps.settings_app.models import FilterCriteria
 
 User = get_user_model()
 
@@ -58,6 +66,53 @@ class ProspectModelTest(ProspectTestMixin, TestCase):
         self.assertEqual(log.action_type, "created")
         self.assertEqual(ProspectActionLog.objects.filter(prospect=self.prospect).count(), 1)
 
+    def test_add_rule_note_helper(self):
+        note = add_rule_note(
+            self.prospect,
+            note="Below surplus threshold",
+            created_by=self.admin,
+            rule_name="FL Rule",
+            source="rule",
+            decision="disqualified",
+        )
+        self.assertIsInstance(note, ProspectRuleNote)
+        self.assertEqual(self.prospect.rule_notes.count(), 1)
+        self.assertEqual(note.created_by, self.admin)
+        self.assertEqual(note.rule_name, "FL Rule")
+        self.assertEqual(note.decision, "disqualified")
+
+    def test_add_rule_note_includes_reasons_on_fail(self):
+        reasons = [
+            "Assessed value $50,000 below minimum $75,000 (Rule A)",
+            "Auction type 'TL' not in allowed ['TD'] (Rule A)",
+        ]
+        note = add_rule_note(
+            self.prospect,
+            note="Manual review override",
+            reasons=reasons,
+            created_by=self.admin,
+            rule_name="Rule A",
+            source="rule",
+            decision="disqualified",
+        )
+        self.assertIn("Failed criteria", note.note)
+        for reason in reasons:
+            self.assertIn(reason, note.note)
+        self.assertGreaterEqual(note.note.count("- "), len(reasons))
+
+    def test_add_rule_note_links_rule_and_decision(self):
+        rule = FilterCriteria.objects.create(name="Auto Rule", prospect_types=["TD"])
+        note = add_rule_note(
+            self.prospect,
+            created_by=self.admin,
+            rule=rule,
+            source="rule",
+            decision="qualified",
+        )
+        self.assertEqual(note.rule, rule)
+        self.assertEqual(note.rule_name, "Auto Rule")
+        self.assertEqual(note.decision, "qualified")
+
 
 class ProspectNoteTest(ProspectTestMixin, TestCase):
     def test_create_note(self):
@@ -80,17 +135,53 @@ class NavigationFlowTest(ProspectTestMixin, TestCase):
         self.assertContains(resp, "Tax Deed")
 
     def test_state_select_page(self):
-        resp = self.client.get("/prospects/TD/")
+        other_state = State.objects.create(name="Georgia", abbreviation="GA")
+        County.objects.create(
+            state=other_state,
+            name="Fulton",
+            slug="fulton",
+            available_prospect_types=["TD"],
+        )
+        resp = self.client.get("/prospects/browse/TD/")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Florida")
+        self.assertNotContains(resp, "Georgia")
+        self.assertContains(resp, "1/1")
+        self.assertContains(resp, "Show All States")
+
+        resp_all = self.client.get("/prospects/browse/TD/?show_all=1")
+        self.assertEqual(resp_all.status_code, 200)
+        self.assertContains(resp_all, "Georgia")
 
     def test_county_select_page(self):
-        resp = self.client.get("/prospects/TD/FL/")
+        Prospect.objects.create(
+            prospect_type="TD",
+            case_number="2024-DQ-COUNTY",
+            county=self.county,
+            auction_date=date(2024, 6, 16),
+            qualification_status="disqualified",
+        )
+        County.objects.create(
+            state=self.state,
+            name="Orange",
+            slug="orange",
+            available_prospect_types=["TD"],
+        )
+        resp = self.client.get("/prospects/browse/TD/FL/")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Miami-Dade")
+        self.assertNotContains(resp, "Orange")
+        self.assertContains(resp, "Show All Counties")
+        self.assertContains(resp, "1/2")
+        self.assertContains(resp, "/prospects/browse/TD/FL/miami-dade/")
+        self.assertContains(resp, "/prospects/calendar/?type=TD&state=FL&county=miami-dade")
+
+        resp_all = self.client.get("/prospects/browse/TD/FL/?show_all=1")
+        self.assertEqual(resp_all.status_code, 200)
+        self.assertContains(resp_all, "Orange")
 
     def test_prospect_list_page(self):
-        resp = self.client.get("/prospects/TD/FL/miami-dade/")
+        resp = self.client.get("/prospects/browse/TD/FL/miami-dade/")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "2024-001234")
 
@@ -107,10 +198,41 @@ class NavigationFlowTest(ProspectTestMixin, TestCase):
             qualification_status="disqualified",
         )
         # Filter for qualified only
-        resp = self.client.get("/prospects/TD/FL/miami-dade/?qualification_status=qualified")
+        resp = self.client.get("/prospects/browse/TD/FL/miami-dade/?qualification_status=qualified")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "2024-001234")
         self.assertNotContains(resp, "2024-DQ")
+
+    def test_calendar_count_links_to_filtered_list(self):
+        Prospect.objects.create(
+            prospect_type="TD",
+            case_number="2024-DQ-SAME-DAY",
+            county=self.county,
+            auction_date=date(2024, 6, 15),
+            qualification_status="disqualified",
+        )
+        resp = self.client.get("/prospects/calendar/?type=TD&state=FL&county=miami-dade&year=2024&month=6")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Qualified 1/2")
+        self.assertContains(
+            resp,
+            "/prospects/browse/TD/all/?auction_date_from=2024-06-15&amp;auction_date_to=2024-06-15&amp;state=FL&amp;county=miami-dade&amp;qualification_status=qualified",
+        )
+        self.assertContains(
+            resp,
+            "/prospects/browse/TD/all/?auction_date_from=2024-06-15&amp;auction_date_to=2024-06-15&amp;state=FL&amp;county=miami-dade\"",
+        )
+        qualified_resp = self.client.get(
+            "/prospects/browse/TD/all/?auction_date_from=2024-06-15&auction_date_to=2024-06-15&state=FL&county=miami-dade&qualification_status=qualified"
+        )
+        self.assertEqual(qualified_resp.status_code, 200)
+        self.assertContains(qualified_resp, "2024-001234")
+        self.assertNotContains(qualified_resp, "2024-DQ-SAME-DAY")
+
+    def test_state_select_has_state_filtered_calendar_link(self):
+        resp = self.client.get("/prospects/browse/TD/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "/prospects/calendar/?type=TD&state=FL")
 
 
 class AssignmentWorkflowTest(ProspectTestMixin, TestCase):

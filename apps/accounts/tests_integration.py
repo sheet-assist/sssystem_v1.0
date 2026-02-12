@@ -95,8 +95,8 @@ class EndToEndPipelineTest(TestCase):
 
         # Create filter criteria: min surplus $10k
         FilterCriteria.objects.create(
-            name="FL TD Default", prospect_type="TD",
-            state=self.state, min_surplus_amount=Decimal("10000"),
+            name="FL TD Default", prospect_types=["TD"],
+            state=self.state, surplus_amount_min=Decimal("10000"),
         )
 
         self.admin_client = Client()

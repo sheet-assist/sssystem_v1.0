@@ -20,6 +20,12 @@ LABEL_REGEX_MAP = {
 
 CURRENCY_FIELDS = {"final_judgment_amount", "assessed_value", "plaintiff_max_bid"}
 
+# Mapping from auction types to internal prospect type codes
+AUCTION_TYPE_TO_PROSPECT_TYPE = {
+    "TAXDEED": "TD",
+    "FORECLOSURE": "MF",
+}
+
 
 def parse_currency(text):
     """Convert currency string like '$1,234.56' to Decimal or None."""
@@ -134,12 +140,20 @@ def normalize_prospect_data(raw, auction_date, prospect_type, source_url=""):
     Maps every field from scrape.py output and converts currency strings to Decimal.
     """
     city, state, zip_code = parse_city_state_zip(raw.get("city_state_zip", ""))
+    auction_type = raw.get("auction_type", "")
+    normalized_auction_type = ""
+    if auction_type:
+        normalized_auction_type = re.sub(r"[^A-Z]", "", auction_type.upper())
+    resolved_prospect_type = AUCTION_TYPE_TO_PROSPECT_TYPE.get(
+        normalized_auction_type, prospect_type
+    )
+    # print(f"Normalized auction type '{auction_type}' to prospect type '{resolved_prospect_type}'")
 
     return {
-        "prospect_type": prospect_type,
+        "prospect_type": resolved_prospect_type,
         "auction_item_number": raw.get("auction_id", ""),
         "case_number": raw.get("case_number", ""),
-        "auction_type": raw.get("auction_type", ""),
+        "auction_type": auction_type,
         "property_address": raw.get("property_address", ""),
         "city": city,
         "state": state,
@@ -150,6 +164,7 @@ def normalize_prospect_data(raw, auction_date, prospect_type, source_url=""):
         "assessed_value": parse_currency(raw.get("assessed_value")),
         "sale_amount": parse_currency(raw.get("sold_amount")),
         "auction_status": raw.get("auction_status", ""),
+        "sold_to": raw.get("sold_to", ""),  
         "source_url": source_url,
         "raw_data": raw,
     }

@@ -84,10 +84,20 @@ class JobCreationForm(forms.ModelForm):
         label="Job Name",
         help_text="Descriptive name for this job",
     )
+    group_name = forms.CharField(
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Optional group label (e.g., Miami Batch A)",
+        }),
+        label="Group Name",
+        help_text="Use to group related jobs on the job list",
+    )
     
     class Meta:
         model = ScrapingJob
-        fields = ['name', 'start_date', 'end_date']
+        fields = ['name', 'group_name', 'start_date', 'end_date']
     
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -268,9 +278,32 @@ class JobFilterForm(forms.Form):
 # ============================================================================
 
 class ScrapeJobForm(forms.ModelForm):
-    county = forms.ModelChoiceField(
-        queryset=County.objects.filter(is_active=True).select_related("state"),
-        widget=forms.Select(attrs={"class": "form-select"}),
+    name = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "e.g., Florida TD Batch 2026-03-01",
+        }),
+        label="Job Name",
+        help_text="Used to group multiple county runs into a single batch",
+    )
+    state = forms.ModelChoiceField(
+        queryset=State.objects.filter(is_active=True).order_by("name"),
+        widget=forms.Select(attrs={
+            "class": "form-select",
+            "id": "id_state",
+        }),
+        label="State",
+    )
+    counties = forms.ModelMultipleChoiceField(
+        queryset=County.objects.none(),
+        widget=forms.SelectMultiple(attrs={
+            "class": "form-select",
+            "id": "id_counties",
+            "size": "12",
+        }),
+        label="Counties",
+        help_text="Choose one or more counties. Use Ctrl/Command + click for multi-select.",
     )
     job_type = forms.ChoiceField(
         choices=ScrapeJob.JOB_TYPE,
@@ -289,15 +322,85 @@ class ScrapeJobForm(forms.ModelForm):
 
     class Meta:
         model = ScrapeJob
-        fields = ["county", "job_type", "target_date", "end_date"]
+        fields = ["name", "job_type", "target_date", "end_date"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Always work with fresh queryset copies
+        self.fields["state"].queryset = State.objects.filter(is_active=True).order_by("name")
+
+        state_value = self.data.get("state") or self.initial.get("state")
+        state_obj = None
+
+        if isinstance(state_value, State):
+            state_obj = state_value
+        elif state_value:
+            try:
+                state_obj = State.objects.get(pk=state_value)
+            except (State.DoesNotExist, ValueError):
+                state_obj = None
+
+        if state_obj is None and hasattr(self.instance, "county") and self.instance.pk:
+            state_obj = self.instance.county.state
+
+        if state_obj:
+            self.fields["counties"].queryset = County.objects.filter(
+                is_active=True,
+                state=state_obj,
+            ).order_by("name")
+            self.fields["counties"].widget.attrs.pop("disabled", None)
+        else:
+            self.fields["counties"].queryset = County.objects.none()
+            self.fields["counties"].widget.attrs["disabled"] = "disabled"
 
     def clean(self):
         cleaned = super().clean()
+        state = cleaned.get("state")
+        counties = cleaned.get("counties")
         start = cleaned.get("target_date")
         end = cleaned.get("end_date")
+
         if start and end and end < start:
             raise forms.ValidationError("End date must be on or after the start date.")
+
+        if not counties:
+            self.add_error("counties", "Select at least one county.")
+        elif state:
+            invalid = [county for county in counties if county.state_id != state.id]
+            if invalid:
+                self.add_error(
+                    "counties",
+                    "All selected counties must belong to the chosen state.",
+                )
+
         return cleaned
+
+    def save_multiple(self, *, triggered_by=None):
+        """Create a ScrapeJob per selected county."""
+        if not self.is_valid():
+            raise ValueError("Cannot save jobs from an invalid form.")
+
+        jobs = []
+        job_data = {
+            "name": self.cleaned_data["name"],
+            "job_type": self.cleaned_data["job_type"],
+            "target_date": self.cleaned_data["target_date"],
+            "end_date": self.cleaned_data.get("end_date"),
+            "status": "pending",
+        }
+
+        for county in self.cleaned_data["counties"]:
+            job = ScrapeJob(
+                county=county,
+                **job_data,
+            )
+            if triggered_by:
+                job.triggered_by = triggered_by
+            job.save()
+            jobs.append(job)
+
+        return jobs
 
 # ============================================================================
 # PROSPECT FILTER FORM: Financial Criteria Filtering

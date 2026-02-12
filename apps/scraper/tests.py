@@ -7,7 +7,7 @@ from django.test import Client, TestCase
 from apps.locations.models import County, State
 from apps.prospects.models import Prospect
 
-from .engine import build_auction_url, get_base_url
+from .engine.url_utils import build_auction_url, get_base_url
 from .models import ScrapeJob, ScrapeLog
 from .parsers import (
     normalize_prospect_data,
@@ -167,6 +167,16 @@ class EngineUrlTest(TestCase):
         url = get_base_url(self.county, "MF")
         self.assertEqual(url, "https://miami-dade.realforeclose.com")
 
+    def test_get_base_url_normalizes_scheme_and_www(self):
+        county = County.objects.create(
+            state=self.state,
+            name="Jackson",
+            slug="jackson",
+            foreclosure_url="http://www.jackson.realforeclose.com/",
+        )
+        url = get_base_url(county, "MF")
+        self.assertEqual(url, "https://jackson.realforeclose.com")
+
     def test_get_base_url_missing_raises(self):
         empty_county = County.objects.create(
             state=self.state, name="Empty", slug="empty",
@@ -192,6 +202,7 @@ class ScrapeJobModelTest(TestCase):
 
     def test_create_job(self):
         job = ScrapeJob.objects.create(
+            name="Test Job",
             county=self.county, job_type="TD", target_date=date(2026, 3, 15),
         )
         self.assertEqual(job.status, "pending")
@@ -199,6 +210,7 @@ class ScrapeJobModelTest(TestCase):
 
     def test_create_job_with_date_range(self):
         job = ScrapeJob.objects.create(
+            name="Range Job",
             county=self.county, job_type="TD",
             target_date=date(2026, 3, 15), end_date=date(2026, 3, 20),
         )
@@ -206,6 +218,7 @@ class ScrapeJobModelTest(TestCase):
 
     def test_scrape_log(self):
         job = ScrapeJob.objects.create(
+            name="Log Job",
             county=self.county, job_type="TD", target_date=date(2026, 3, 15),
         )
         log = ScrapeLog.objects.create(job=job, level="info", message="Test")
@@ -231,14 +244,16 @@ class ScraperViewsTest(TestCase):
 
     def test_job_list(self):
         ScrapeJob.objects.create(
+            name="List Job",
             county=self.county, job_type="TD", target_date=date(2026, 3, 15),
         )
         resp = self.client.get("/scraper/jobs/")
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "Miami-Dade")
+        self.assertContains(resp, "List Job")
 
     def test_job_create(self):
         resp = self.client.post("/scraper/jobs/create/", {
+            "name": "POST Job",
             "county": self.county.pk,
             "job_type": "TD",
             "target_date": "2026-03-15",
@@ -250,6 +265,7 @@ class ScraperViewsTest(TestCase):
 
     def test_job_create_with_date_range(self):
         resp = self.client.post("/scraper/jobs/create/", {
+            "name": "Range Post",
             "county": self.county.pk,
             "job_type": "TD",
             "target_date": "2026-03-15",
@@ -261,6 +277,7 @@ class ScraperViewsTest(TestCase):
 
     def test_job_create_invalid_date_range(self):
         resp = self.client.post("/scraper/jobs/create/", {
+            "name": "Bad Range",
             "county": self.county.pk,
             "job_type": "TD",
             "target_date": "2026-03-20",
@@ -271,11 +288,42 @@ class ScraperViewsTest(TestCase):
 
     def test_job_detail(self):
         job = ScrapeJob.objects.create(
+            name="Detail Job",
             county=self.county, job_type="TD", target_date=date(2026, 3, 15),
         )
         resp = self.client.get(f"/scraper/jobs/{job.pk}/")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Miami-Dade")
+
+    def test_job_group_detail(self):
+        other_county = County.objects.create(
+            state=self.state,
+            name="Broward",
+            slug="broward",
+            taxdeed_url="https://broward.example.com",
+        )
+        job1 = ScrapeJob.objects.create(
+            name="Batch View",
+            county=self.county,
+            job_type="TD",
+            target_date=date(2026, 3, 15),
+            status="completed",
+            prospects_created=20,
+        )
+        ScrapeJob.objects.create(
+            name="Batch View",
+            county=other_county,
+            job_type="TD",
+            target_date=date(2026, 3, 15),
+            status="failed",
+            prospects_created=5,
+        )
+
+        resp = self.client.get(f"/scraper/jobs/group/{job1.pk}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Batch View")
+        self.assertContains(resp, other_county.name)
+        self.assertContains(resp, "Prospects Scraped")
 
     def test_non_admin_cannot_access(self):
         user = User.objects.create_user(username="worker", password="pass")

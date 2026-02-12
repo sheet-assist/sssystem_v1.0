@@ -6,31 +6,86 @@
     <h2>Create Scrape Job</h2>
     <div class="card">
       <div class="card-body">
-        <form method="post">
+        <form method="post" id="scrape-job-form" novalidate>
           {% csrf_token %}
-          <div class="mb-3">
-            <label for="id_county" class="form-label">County</label>
-            {{ form.county }}
-            {% if form.county.errors %}<div class="text-danger small">{{ form.county.errors.0 }}</div>{% endif %}
-          </div>
-          <div class="mb-3">
-            <label for="id_job_type" class="form-label">Job Type</label>
-            {{ form.job_type }}
-          </div>
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label for="id_target_date" class="form-label">Start Date</label>
-              {{ form.target_date }}
-            </div>
-            <div class="col-md-6 mb-3">
-              <label for="id_end_date" class="form-label">End Date (optional)</label>
-              {{ form.end_date }}
-              <small class="text-muted">Leave blank for a single date.</small>
-            </div>
-          </div>
           {% if form.non_field_errors %}
           <div class="alert alert-danger">{{ form.non_field_errors.0 }}</div>
           {% endif %}
+
+          {% if form.fields.counties %}
+          <div class="mb-3">
+            <label for="id_name" class="form-label">{{ form.name.label }}</label>
+            {{ form.name }}
+            <small class="text-muted">Jobs sharing the same name will be grouped together in the list.</small>
+            {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors.0 }}</div>{% endif %}
+          </div>
+
+          {% url 'scraper:counties_ajax_api' '__STATE__' as counties_url_template %}
+          {% with selected_state=form.state.value|default_if_none:'' %}
+          <div class="mb-3">
+            <label for="id_state" class="form-label">Select State</label>
+            <select
+              name="{{ form.state.html_name }}"
+              id="id_state"
+              class="form-select"
+              data-counties-url-template="{{ counties_url_template }}"
+            >
+              <option value="">-- Choose a state --</option>
+              {% for state in form.fields.state.queryset %}
+                {% with option_value=state.pk|stringformat:"s" %}
+                <option value="{{ option_value }}" data-state-code="{{ state.abbreviation }}" {% if option_value == selected_state %}selected{% endif %}>{{ state.name }} ({{ state.abbreviation }})</option>
+                {% endwith %}
+              {% endfor %}
+            </select>
+            {% if form.state.errors %}<div class="text-danger small">{{ form.state.errors.0 }}</div>{% endif %}
+          </div>
+          {% endwith %}
+
+          <div class="mb-3">
+            <label for="id_counties" class="form-label">Select Counties</label>
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+              <div class="flex-grow-1">
+                <input type="search" class="form-control form-control-sm" id="counties-filter" placeholder="Search counties" autocomplete="off">
+              </div>
+              <div class="btn-group btn-group-sm flex-shrink-0" role="group" aria-label="County selection helpers">
+                <button type="button" class="btn btn-outline-primary" id="select-all-counties">Select All</button>
+                <button type="button" class="btn btn-outline-secondary" id="clear-all-counties">Clear</button>
+              </div>
+            </div>
+            <div id="counties-summary" class="badge bg-light text-dark mb-2">Select a state to load counties.</div>
+            <div id="counties-chips" class="d-flex flex-wrap gap-1 mb-2 visually-hidden"></div>
+            {{ form.counties }}
+            <div id="counties-status" class="small text-muted mt-1">Select a state to load counties.</div>
+            <small class="text-muted d-block mt-1">Hold Ctrl/Command while clicking to select multiple counties.</small>
+            {% if form.counties.errors %}<div class="text-danger small">{{ form.counties.errors.0 }}</div>{% endif %}
+          </div>
+
+          {% if form.fields.job_type %}
+          <div class="mb-3">
+            <label for="id_job_type" class="form-label">{{ form.job_type.label }}</label>
+            {{ form.job_type }}
+            {% if form.job_type.errors %}<div class="text-danger small">{{ form.job_type.errors.0 }}</div>{% endif %}
+          </div>
+          {% endif %}
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="id_target_date" class="form-label">{{ form.target_date.label }}</label>
+              {{ form.target_date }}
+              {% if form.target_date.errors %}<div class="text-danger small">{{ form.target_date.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="id_end_date" class="form-label">{{ form.end_date.label }}</label>
+              {{ form.end_date }}
+              <small class="text-muted">Leave blank for a single date.</small>
+              {% if form.end_date.errors %}<div class="text-danger small">{{ form.end_date.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+          {% else %}
+          <div class="alert alert-info">Please complete the required fields below.</div>
+          {{ form.as_p }}
+          {% endif %}
+
           <button type="submit" class="btn btn-primary">Create Job</button>
           <a href="{% url 'scraper:dashboard' %}" class="btn btn-secondary">Cancel</a>
         </form>
@@ -38,4 +93,277 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if form.fields.counties %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const stateSelect = document.getElementById('id_state');
+    const countiesSelect = document.getElementById('id_counties');
+    const selectAllButton = document.getElementById('select-all-counties');
+    const clearAllButton = document.getElementById('clear-all-counties');
+    const statusLabel = document.getElementById('counties-status');
+    const filterInput = document.getElementById('counties-filter');
+    const summaryBadge = document.getElementById('counties-summary');
+    const chipsContainer = document.getElementById('counties-chips');
+
+    if (!stateSelect || !countiesSelect) {
+      return;
+    }
+
+    const urlTemplate = stateSelect.dataset.countiesUrlTemplate;
+
+    const updateStatus = (message) => {
+      if (statusLabel) {
+        statusLabel.textContent = message;
+      }
+    };
+
+    const setSummaryMessage = (message) => {
+      if (summaryBadge) {
+        summaryBadge.textContent = message;
+      }
+    };
+
+    const getSelectedOptions = () => Array.from(countiesSelect.options).filter((option) => option.selected);
+
+    const renderSelectedChips = (selectedOptions) => {
+      if (!chipsContainer) {
+        return;
+      }
+
+      chipsContainer.innerHTML = '';
+
+      if (!selectedOptions.length) {
+        chipsContainer.classList.add('visually-hidden');
+        return;
+      }
+
+      chipsContainer.classList.remove('visually-hidden');
+
+      const MAX_CHIPS = 8;
+      selectedOptions.slice(0, MAX_CHIPS).forEach((option) => {
+        const chip = document.createElement('span');
+        chip.className = 'badge bg-primary text-white d-inline-flex align-items-center px-2';
+        chip.dataset.countyValue = option.value;
+        chip.setAttribute('role', 'button');
+        chip.setAttribute('tabindex', '0');
+        chip.innerHTML = `${option.textContent}<span class="ms-1" aria-hidden="true">&times;</span>`;
+        chipsContainer.appendChild(chip);
+      });
+
+      if (selectedOptions.length > MAX_CHIPS) {
+        const remaining = document.createElement('span');
+        remaining.className = 'badge bg-secondary text-white';
+        remaining.textContent = `+${selectedOptions.length - MAX_CHIPS} more`;
+        chipsContainer.appendChild(remaining);
+      }
+    };
+
+    const syncActionState = () => {
+      const disabled = countiesSelect.disabled || countiesSelect.options.length === 0;
+      if (selectAllButton) {
+        selectAllButton.disabled = disabled;
+      }
+      if (clearAllButton) {
+        clearAllButton.disabled = disabled;
+      }
+      if (filterInput) {
+        filterInput.disabled = disabled;
+      }
+    };
+
+    const refreshSummary = () => {
+      const selected = getSelectedOptions();
+      if (countiesSelect.disabled) {
+        setSummaryMessage('Select a state to load counties.');
+      } else if (!selected.length) {
+        setSummaryMessage('No counties selected.');
+      } else if (selected.length === 1) {
+        setSummaryMessage('1 county selected.');
+      } else {
+        setSummaryMessage(`${selected.length} counties selected.`);
+      }
+      renderSelectedChips(selected);
+    };
+
+    const updateSelectionState = () => {
+      syncActionState();
+      refreshSummary();
+    };
+
+    const resetFilter = () => {
+      if (filterInput) {
+        filterInput.value = '';
+      }
+      Array.from(countiesSelect.options).forEach((option) => {
+        option.hidden = false;
+      });
+    };
+
+    const applyFilter = (term) => {
+      const normalized = term.trim().toLowerCase();
+      let visibleCount = 0;
+
+      Array.from(countiesSelect.options).forEach((option) => {
+        const matches = !normalized || option.textContent.toLowerCase().includes(normalized);
+        option.hidden = !matches;
+        if (matches) {
+          visibleCount += 1;
+        }
+      });
+
+      if (!normalized) {
+        updateStatus(`${visibleCount} counties available.`);
+      } else if (visibleCount) {
+        updateStatus(`${visibleCount} counties match your search.`);
+      } else {
+        updateStatus('No counties match your search.');
+      }
+    };
+
+    const clearCounties = (message) => {
+      countiesSelect.innerHTML = '';
+      countiesSelect.disabled = true;
+      updateStatus(message);
+      setSummaryMessage('Select a state to load counties.');
+      if (chipsContainer) {
+        chipsContainer.innerHTML = '';
+        chipsContainer.classList.add('visually-hidden');
+      }
+      if (filterInput) {
+        filterInput.value = '';
+        filterInput.disabled = true;
+      }
+      syncActionState();
+    };
+
+    const populateCounties = (items) => {
+      countiesSelect.innerHTML = '';
+      items.forEach(({ id, name }) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = name;
+        countiesSelect.appendChild(option);
+      });
+      countiesSelect.disabled = items.length === 0;
+      resetFilter();
+      updateStatus(items.length ? `${items.length} counties available.` : 'No counties available for this state.');
+      updateSelectionState();
+    };
+
+    updateSelectionState();
+
+    if (!countiesSelect.disabled && countiesSelect.options.length) {
+      updateStatus(`${countiesSelect.options.length} counties available.`);
+    }
+
+    stateSelect.addEventListener('change', () => {
+      const selectedOption = stateSelect.options[stateSelect.selectedIndex];
+      const stateCode = selectedOption ? selectedOption.dataset.stateCode : '';
+
+      if (!stateCode) {
+        clearCounties('Select a state to load counties.');
+        return;
+      }
+
+      updateStatus('Loading counties...');
+      countiesSelect.disabled = true;
+      syncActionState();
+      if (filterInput) {
+        filterInput.value = '';
+        filterInput.disabled = true;
+      }
+
+      const url = urlTemplate.replace('__STATE__', stateCode);
+
+      fetch(url)
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.success) {
+            populateCounties(data.counties || []);
+          } else {
+            clearCounties('Unable to load counties. Try again.');
+          }
+        })
+        .catch(() => clearCounties('Unable to load counties. Try again.'))
+        .finally(() => {
+          if (filterInput && !countiesSelect.disabled) {
+            filterInput.disabled = false;
+          }
+        });
+    });
+
+    if (selectAllButton) {
+      selectAllButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (countiesSelect.disabled) {
+          return;
+        }
+        for (const option of countiesSelect.options) {
+          if (!option.hidden) {
+            option.selected = true;
+          }
+        }
+        updateSelectionState();
+      });
+    }
+
+    if (clearAllButton) {
+      clearAllButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (countiesSelect.disabled) {
+          return;
+        }
+        Array.from(countiesSelect.options).forEach((option) => {
+          option.selected = false;
+        });
+        updateSelectionState();
+      });
+    }
+
+    if (countiesSelect) {
+      countiesSelect.addEventListener('change', updateSelectionState);
+    }
+
+    if (filterInput) {
+      filterInput.addEventListener('input', (event) => {
+        if (countiesSelect.disabled) {
+          return;
+        }
+        applyFilter(event.target.value);
+      });
+    }
+
+    if (chipsContainer) {
+      const handleChipRemoval = (value) => {
+        const option = Array.from(countiesSelect.options).find((opt) => opt.value === value);
+        if (option) {
+          option.selected = false;
+          updateSelectionState();
+        }
+      };
+
+      chipsContainer.addEventListener('click', (event) => {
+        const target = event.target.closest('[data-county-value]');
+        if (target) {
+          handleChipRemoval(target.dataset.countyValue);
+        }
+      });
+
+      chipsContainer.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+          return;
+        }
+        const target = event.target.closest('[data-county-value]');
+        if (target) {
+          event.preventDefault();
+          handleChipRemoval(target.dataset.countyValue);
+        }
+      });
+    }
+  });
+</script>
+{% endif %}
 {% endblock %}

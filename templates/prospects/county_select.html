@@ -25,21 +25,74 @@
 
 <h2 class="mb-4">{{ type_display }} &mdash; {{ state_abbr }} Counties</h2>
 
-<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-2">
+<div class="mb-3">
+  {% if show_all %}
+  <a href="{% url 'prospects:county_select' prospect_type state_abbr %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-funnel me-1"></i> Show Counties With Count
+  </a>
+  {% else %}
+  <a href="{% url 'prospects:county_select' prospect_type state_abbr %}?show_all=1" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-list-ul me-1"></i> Show All Counties
+  </a>
+  {% endif %}
+</div>
+
+<div class="mb-3">
+  <input
+    id="countySearchInput"
+    type="text"
+    class="form-control"
+    placeholder="Search counties..."
+    autocomplete="off"
+  >
+</div>
+
+<div id="countyCardsGrid" class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-2">
   {% for county in counties %}
-  <div class="col">
-    <a href="{% url 'prospects:list' prospect_type state_abbr county.slug %}" class="text-decoration-none">
-      <div class="card h-100 border-secondary hover-card">
-        <div class="card-body text-center py-2 px-3">
-          <h6 class="card-title text-dark mb-0">{{ county.name }}</h6>
+  <div class="col searchable-item" data-search-text="{{ county.name|lower }}">
+    <div class="card h-100 border-secondary hover-card">
+      <div class="card-body text-center py-2 px-3 d-flex flex-column">
+        <h6 class="card-title text-dark mb-2">{{ county.name }}</h6>
+        <div class="mb-2">
+          {% if county.total_count > 0 %}
+          <span class="badge text-dark border" style="background-color: #fff3cd;">
+            {{ county.qualified_count }}/{{ county.total_count }}
+          </span>
+          {% endif %}
+        </div>
+        <div class="mt-auto d-grid gap-2">
+          <a href="{% url 'prospects:list' prospect_type state_abbr county.slug %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-list-ul me-1"></i> List
+          </a>
+          <a href="{% url 'prospects:calendar' %}?type={{ prospect_type }}&state={{ state_abbr }}&county={{ county.slug }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-calendar3 me-1"></i> Calendar
+          </a>
         </div>
       </div>
-    </a>
+    </div>
   </div>
   {% empty %}
   <div class="col-12">
-    <div class="alert alert-info">No active counties found for {{ state_abbr }}.</div>
+    <div class="alert alert-info">
+      No counties found{% if not show_all %} with prospect counts{% endif %} for {{ state_abbr }}.
+    </div>
   </div>
   {% endfor %}
 </div>
+
+<script>
+  (function () {
+    const input = document.getElementById("countySearchInput");
+    const items = Array.from(document.querySelectorAll("#countyCardsGrid .searchable-item"));
+    if (!input || !items.length) return;
+
+    input.addEventListener("input", function () {
+      const q = input.value.trim().toLowerCase();
+      items.forEach(function (item) {
+        const text = item.getAttribute("data-search-text") || "";
+        item.style.display = text.includes(q) ? "" : "none";
+      });
+    });
+  })();
+</script>
 {% endblock %}
