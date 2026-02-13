@@ -17,7 +17,20 @@ LABEL_REGEX_MAP = {
     r"property\s*address": "property_address",
     r"assessed\s*value": "assessed_value",
     r"plaintiff\s*max\s*bid": "plaintiff_max_bid",
+    r"opening\s*bid": "opening_bid",
+    
 }
+
+
+def _normalize_label(text):
+    """Normalize raw label text so regex matching stays reliable."""
+    if not text:
+        return ""
+
+    cleaned = text.replace("\xa0", " ")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    cleaned = re.sub(r"[:]+$", "", cleaned).strip()
+    return cleaned.lower()
 
 
 def scrape_single_date(page, base_url, auction_date, log_fn):
@@ -99,6 +112,7 @@ def scrape_single_date(page, base_url, auction_date, log_fn):
                     "auction_status": auction_status,
                     "sold_amount": None,
                     "sold_to": "",
+                    "opening_bid": None,
                 }
 
                 for row in item.select(".AUCTION_DETAILS table.ad_tab tr"):
@@ -106,8 +120,8 @@ def scrape_single_date(page, base_url, auction_date, log_fn):
                     if len(tds) < 2:
                         continue
 
-                    raw_label = tds[0].get_text(" ", strip=True).lower()
-                    value = tds[1].get_text(" ", strip=True)
+                    raw_label = _normalize_label(tds[0].get_text(" ", strip=True))
+                    value = tds[1].get_text(" ", strip=True).replace("\xa0", " ").strip()
 
                     if raw_label == "":
                         record["city_state_zip"] = value

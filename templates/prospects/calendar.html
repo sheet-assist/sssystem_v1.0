@@ -5,24 +5,24 @@
 
 {% block extra_css %}
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&display=swap');
-
-.calendar-hero {
-  background: radial-gradient(circle at top left, rgba(84, 112, 255, 0.35), rgba(15, 15, 30, 0.9));
-  border-radius: 1.25rem;
-  padding: 1.5rem 1.75rem;
-  color: #f8f9ff;
-  font-family: 'Space Grotesk', var(--bs-font-sans-serif);
+.calendar-stat-card {
+  border-radius: 0.75rem;
+  border: 1px solid #dee2e6;
 }
-.calendar-hero h1 {
+.calendar-stat-card .stat-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  color: #6c757d;
 }
-.calendar-hero .stat-pill {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 999px;
-  padding: 0.35rem 0.85rem;
+.calendar-stat-card .stat-value {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #212529;
+}
+.calendar-stat-card .stat-subtitle {
   font-size: 0.9rem;
+  color: #6c757d;
 }
 .calendar-grid thead th {
   font-size: 0.78rem;
@@ -88,20 +88,41 @@
 {% endblock %}
 
 {% block content %}
-<section class="calendar-hero mb-3">
-  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
-    <div>
-      <p class="stat-pill mb-2">Qualified {{ month_qualified_total }}/{{ total_events }}</p>
-      <h1 class="mb-1">{{ current_month|date:"F Y" }}</h1>
-      <p class="mb-0 text-white-50">Click a day count to open the prospects list for that date.</p>
-    </div>
-    <div class="text-lg-end">
-      <a class="btn btn-outline-light btn-sm" href="?{{ today_query }}">
-        <i class="bi bi-arrow-counterclockwise me-1"></i> Jump to Today
-      </a>
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-lg-4">
+    <div class="card shadow-sm h-100 calendar-stat-card">
+      <div class="card-body">
+        <p class="stat-label text-uppercase mb-1">Qualified Prospects</p>
+        <div class="d-flex align-items-baseline gap-2">
+          <span class="stat-value">{{ month_qualified_total }}</span>
+          <span class="stat-subtitle">of {{ total_events }}</span>
+        </div>
+        <p class="stat-subtitle mb-0">Qualified leads captured in {{ current_month|date:"F" }}.</p>
+      </div>
     </div>
   </div>
-</section>
+  <div class="col-sm-6 col-lg-4">
+    <div class="card shadow-sm h-100 calendar-stat-card">
+      <div class="card-body">
+        <p class="stat-label text-uppercase mb-1">Total Events Tracked</p>
+        <div class="stat-value">{{ total_events }}</div>
+        <p class="stat-subtitle mb-0">Prospect interactions scheduled this month—tap any day count to inspect the list.</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-4">
+    <div class="card shadow-sm h-100 calendar-stat-card">
+      <div class="card-body d-flex flex-column">
+        <p class="stat-label text-uppercase mb-1">Calendar Shortcuts</p>
+        <div class="stat-value">{{ today|date:"M j" }}</div>
+        <p class="stat-subtitle mb-3 flex-grow-1">Return to the current day with a single click.</p>
+        <a class="btn btn-outline-primary btn-sm mt-auto align-self-start" href="?{{ today_query }}">
+          <i class="bi bi-arrow-counterclockwise me-1"></i> Jump to Today
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="card shadow-sm border-0 mb-3">
   <div class="card-body py-3">

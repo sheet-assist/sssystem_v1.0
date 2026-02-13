@@ -80,10 +80,17 @@ def persist_scraped_data(job, scraped_items):
 
             sale_amount_value = _to_decimal(data.get("sale_amount"))
             final_amount_value = _to_decimal(data.get("final_judgment_amount"))
+            opening_bid_value = _to_decimal(data.get("opening_bid"))
+            prospect_type = data.get("prospect_type", "")
             surplus_amount_value = Decimal("0")
+            print(f"Processing prospect {case_number} of opening bid amount    {opening_bid_value}")
             if sale_amount_value is not None:
-                surplus_amount_value = sale_amount_value - (final_amount_value or Decimal("0"))
-
+                
+                if prospect_type == "TD":
+                    surplus_amount_value = sale_amount_value - (opening_bid_value or Decimal("0"))
+                else:
+                    surplus_amount_value = sale_amount_value - (final_amount_value or Decimal("0"))
+                print(f"Calculated surplus amount for case {case_number} as {surplus_amount_value}")
             defaults = {
                 "prospect_type": data.get("prospect_type", ""),
                 "auction_item_number": data.get("auction_item_number", ""),
@@ -102,6 +109,7 @@ def persist_scraped_data(job, scraped_items):
                 "auction_status": data.get("auction_status", ""),
                 "source_url": data.get("source_url", ""),
                 "raw_data": data.get("raw_data", {}),
+                "opening_bid": opening_bid_value,
             }
             # sold_data = data.get("sold_to", "")
             # print(f"Upserting prospect with sold to-----------------------: {sold_data}")
@@ -129,6 +137,7 @@ def persist_scraped_data(job, scraped_items):
                     "final_judgment_amount",
                     "plaintiff_max_bid",
                     "auction_type",
+                    "opening_bid",
                 ):
                     if field == "sale_amount":
                         val = sale_amount_value
@@ -136,6 +145,8 @@ def persist_scraped_data(job, scraped_items):
                         val = final_amount_value
                     elif field == "surplus_amount":
                         val = surplus_amount_value
+                    elif field == "opening_bid":
+                        val = opening_bid_value      
                     else:
                         val = data.get(field)
                     if val not in (None, ""):
