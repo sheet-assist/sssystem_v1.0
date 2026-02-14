@@ -41,7 +41,11 @@ coverage.xml
 # Django
 *.log
 local_settings.py
+<<<<<<< HEAD
 #db.sqlite3
+=======
+# db.sqlite3
+>>>>>>> f8d0da629fb72b882825ee79618f80ec4c58df98
 db.sqlite3-journal
 /staticfiles/
 /media/

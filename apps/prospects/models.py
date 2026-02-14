@@ -53,6 +53,7 @@ class Prospect(models.Model):
     state = models.CharField(max_length=50, blank=True, default="")
     zip_code = models.CharField(max_length=20, blank=True, default="")
     parcel_id = models.CharField(max_length=200, blank=True, default="")
+    parcel_url = models.URLField(blank=True, default="")
 
     # Financial
     final_judgment_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
