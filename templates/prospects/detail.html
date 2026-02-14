@@ -1,4 +1,6 @@
+
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Prospect {{ object.case_number }}{% endblock %}
 
@@ -47,6 +49,11 @@
   <a href="{% url 'prospects:history' object.pk %}" class="btn btn-outline-dark btn-sm me-1">
     <i class="bi bi-clock-history"></i> History
   </a>
+
+  <a href="{% url 'prospects:documents_page_v2' object.pk %}" target="_blank" rel="noopener" id="openDigitalFolderV2Btn" class="btn btn-outline-success btn-sm me-1">
+    <i class="bi bi-folder2-open"></i> Digital Folder V2
+  </a>
+
   {% if user.profile.is_admin %}
   <button
     type="button"
@@ -66,6 +73,8 @@
   </a>
   {% endif %}
 </div>
+
+
 
 <div class="row">
   {# Left Column #}
@@ -409,5 +418,6 @@
     </table>
   </div>
 </div>
+
 {% endblock %}
 

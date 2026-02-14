@@ -208,6 +208,45 @@ class ProspectRuleNote(models.Model):
         return f"Rule note for {self.prospect.case_number} ({self.created_at:%Y-%m-%d %H:%M})"
 
 
+def prospect_document_upload_to(instance, filename):
+    # store under MEDIA_ROOT/prospects/<prospect_pk>/<filename>
+    return f"prospects/{instance.prospect.pk}/{filename}"
+
+
+class ProspectDocument(models.Model):
+    """Files attached to a Prospect (Digital Folder)."""
+    prospect = models.ForeignKey(Prospect, on_delete=models.CASCADE, related_name="documents")
+    file = models.FileField(upload_to=prospect_document_upload_to)
+    name = models.CharField(max_length=255, blank=True)
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    size = models.PositiveIntegerField(null=True, blank=True)
+    content_type = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        ordering = ["-uploaded_at"]
+
+    def __str__(self):
+        return f"{self.name or self.file.name} ({self.prospect.case_number})"
+
+    def filename(self):
+        return self.file.name.split("/")[-1]
+
+
+class ProspectDocumentNote(models.Model):
+    """Notes attached to a ProspectDocument."""
+    document = models.ForeignKey(ProspectDocument, on_delete=models.CASCADE, related_name="notes")
+    content = models.TextField()
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        who = self.created_by.get_full_name() if self.created_by else "System"
+        return f"Document note by {who} on {self.created_at:%Y-%m-%d %H:%M}"
+
 def log_prospect_action(prospect, user, action_type, description="", metadata=None):
     """Utility to log a prospect action."""
     return ProspectActionLog.objects.create(

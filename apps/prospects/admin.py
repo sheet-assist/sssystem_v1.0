@@ -6,6 +6,8 @@ from .models import (
     ProspectEmail,
     ProspectNote,
     ProspectRuleNote,
+    ProspectDocument,
+    ProspectDocumentNote,
 )
 
 
@@ -38,3 +40,17 @@ class ProspectRuleNoteAdmin(admin.ModelAdmin):
     list_display = ("prospect", "rule_name", "decision", "source", "created_by", "created_at")
     list_filter = ("source", "decision")
     search_fields = ("prospect__case_number", "note", "rule_name")
+
+
+@admin.register(ProspectDocument)
+class ProspectDocumentAdmin(admin.ModelAdmin):
+    list_display = ("prospect", "name", "uploaded_by", "uploaded_at", "size")
+    search_fields = ("prospect__case_number", "name")
+    raw_id_fields = ("uploaded_by",)
+
+
+@admin.register(ProspectDocumentNote)
+class ProspectDocumentNoteAdmin(admin.ModelAdmin):
+    list_display = ("document", "created_by", "created_at")
+    search_fields = ("document__prospect__case_number", "content")
+    raw_id_fields = ("created_by",)
