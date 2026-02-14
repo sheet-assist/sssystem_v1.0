@@ -12,13 +12,14 @@ LABEL_REGEX_MAP = {
     r"auction\s*type": "auction_type",
     r"case\s*#|case\s*number": "case_number",
     r"final\s*judgment": "final_judgment_amount",
+    r"opening\s*bid": "opening_bid",
     r"parcel\s*id": "parcel_id",
     r"property\s*address": "property_address",
     r"assessed\s*value": "assessed_value",
     r"plaintiff\s*max\s*bid": "plaintiff_max_bid",
 }
 
-CURRENCY_FIELDS = {"final_judgment_amount", "assessed_value", "plaintiff_max_bid"}
+CURRENCY_FIELDS = {"final_judgment_amount", "assessed_value", "plaintiff_max_bid", "opening_bid"}
 
 # Mapping from auction types to internal prospect type codes
 AUCTION_TYPE_TO_PROSPECT_TYPE = {
@@ -49,7 +50,7 @@ def parse_city_state_zip(text):
     if len(parts) > 1:
         rest = parts[1].strip().split()
         if rest:
-            state = rest[0]
+            state = rest[0].replace("-", "")
         if len(rest) > 1:
             zip_code = rest[1]
     return city, state, zip_code
@@ -86,6 +87,7 @@ def parse_calendar_page(html):
             "auction_type": "",
             "case_number": "",
             "final_judgment_amount": None,
+            "opening_bid": None,
             "parcel_id": "",
             "property_address": "",
             "city_state_zip": "",
@@ -160,6 +162,7 @@ def normalize_prospect_data(raw, auction_date, prospect_type, source_url=""):
         "zip_code": zip_code,
         "parcel_id": raw.get("parcel_id", ""),
         "final_judgment_amount": parse_currency(raw.get("final_judgment_amount")),
+        "opening_bid": parse_currency(raw.get("opening_bid")),
         "plaintiff_max_bid": parse_currency(raw.get("plaintiff_max_bid")),
         "assessed_value": parse_currency(raw.get("assessed_value")),
         "sale_amount": parse_currency(raw.get("sold_amount")),

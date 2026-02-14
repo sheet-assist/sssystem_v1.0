@@ -110,6 +110,7 @@ def persist_scraped_data(job, scraped_items):
                 "source_url": data.get("source_url", ""),
                 "raw_data": data.get("raw_data", {}),
                 "opening_bid": opening_bid_value,
+                "qualification_status": "pending",
             }
             # sold_data = data.get("sold_to", "")
             # print(f"Upserting prospect with sold to-----------------------: {sold_data}")
