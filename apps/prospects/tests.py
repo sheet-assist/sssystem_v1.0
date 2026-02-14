@@ -1,8 +1,10 @@
+import json
 from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from apps.locations.models import County, State
 from apps.prospects.models import (
@@ -203,6 +205,18 @@ class NavigationFlowTest(ProspectTestMixin, TestCase):
         self.assertContains(resp, "2024-001234")
         self.assertNotContains(resp, "2024-DQ")
 
+    def test_prospect_list_defaults_to_qualified(self):
+        # When no qualification_status is supplied, the list should default to showing qualified prospects
+        Prospect.objects.create(
+            prospect_type="TD", case_number="2024-DQ-DEFAULT",
+            county=self.county, auction_date=date(2024, 6, 17),
+            qualification_status="disqualified",
+        )
+        resp = self.client.get("/prospects/browse/TD/FL/miami-dade/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "2024-001234")
+        self.assertNotContains(resp, "2024-DQ-DEFAULT")
+
     def test_calendar_count_links_to_filtered_list(self):
         Prospect.objects.create(
             prospect_type="TD",
@@ -312,3 +326,75 @@ class AccessControlTest(ProspectTestMixin, TestCase):
         c.login(username="worker", password="pass")
         resp = c.post(f"/prospects/detail/{self.prospect.pk}/assign/", {"assigned_to": self.user.pk})
         self.assertEqual(resp.status_code, 403)
+
+
+class ProspectDocumentsTest(ProspectTestMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.client = Client()
+        self.client.login(username="admin", password="pass")
+
+    def _make_file(self, name="test.txt", content=b"hello"):
+        return SimpleUploadedFile(name, content, content_type="text/plain")
+
+    def test_upload_documents_as_assigned_user(self):
+        # assign prospect to a worker and upload as that worker
+        self.prospect.assigned_to = self.user
+        self.prospect.save()
+        c = Client()
+        c.login(username="worker", password="pass")
+
+        f1 = self._make_file("a.txt", b"A")
+        f2 = self._make_file("b.txt", b"B")
+        resp = c.post(f"/prospects/detail/{self.prospect.pk}/documents/upload/", {"files": [f1, f2]})
+        self.assertIn(resp.status_code, (200, 201))
+        self.prospect.refresh_from_db()
+        self.assertEqual(self.prospect.documents.count(), 2)
+
+    def test_upload_denied_for_unassigned_user(self):
+        c = Client()
+        c.login(username="worker", password="pass")
+        f = self._make_file()
+        resp = c.post(f"/prospects/detail/{self.prospect.pk}/documents/upload/", {"files": [f]})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_bulk_delete_by_admin(self):
+        # create two documents
+        d1 = self.prospect.documents.create(file=self._make_file("x.txt"), name="x.txt", uploaded_by=self.admin)
+        d2 = self.prospect.documents.create(file=self._make_file("y.txt"), name="y.txt", uploaded_by=self.admin)
+        self.assertEqual(self.prospect.documents.count(), 2)
+
+        resp = self.client.post(f"/prospects/detail/{self.prospect.pk}/documents/delete/", data=json.dumps({"ids": [d1.pk, d2.pk]}), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.prospect.refresh_from_db()
+        self.assertEqual(self.prospect.documents.count(), 0)
+
+    def test_list_documents_partial_v2(self):
+        self.prospect.documents.create(file=self._make_file("z2.txt"), name="z2.txt", uploaded_by=self.admin)
+        resp = self.client.get(f"/prospects/detail/{self.prospect.pk}/documents/v2/list/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "z2.txt")
+
+    def test_add_note_to_document(self):
+        doc = self.prospect.documents.create(file=self._make_file("note.txt"), name="note.txt", uploaded_by=self.admin)
+        # add note as admin
+        resp = self.client.post(f"/prospects/detail/{self.prospect.pk}/documents/{doc.pk}/notes/add/", {"content": "File note"})
+        self.assertEqual(resp.status_code, 200)
+        doc.refresh_from_db()
+        self.assertEqual(doc.notes.count(), 1)
+        note = doc.notes.first()
+        self.assertEqual(note.content, "File note")
+        self.assertEqual(note.created_by, self.admin)
+
+    def test_add_note_requires_content(self):
+        doc = self.prospect.documents.create(file=self._make_file("note2.txt"), name="note2.txt", uploaded_by=self.admin)
+        resp = self.client.post(f"/prospects/detail/{self.prospect.pk}/documents/{doc.pk}/notes/add/", {"content": ""})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_documents_page_v2_loads(self):
+        self.prospect.documents.create(file=self._make_file("zv2.txt"), name="zv2.txt", uploaded_by=self.admin)
+        resp = self.client.get(f"/prospects/detail/{self.prospect.pk}/documents/v2/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Digital Folder V2")
+        self.assertContains(resp, "zv2.txt")
+

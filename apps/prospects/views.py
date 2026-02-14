@@ -10,6 +10,11 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, ListView, TemplateView
 from django_filters.views import FilterView
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden, FileResponse, HttpResponse
+from django.views.decorators.http import require_http_methods
+from django.contrib.auth.decorators import login_required
+from django.template.loader import render_to_string
+import json
 
 from apps.accounts.mixins import AdminRequiredMixin, ProspectsAccessMixin
 from apps.locations.models import County, State
@@ -116,6 +121,34 @@ class ProspectListView(ProspectsAccessMixin, FilterView):
             qs = qs.filter(county__slug=county_slug)
         return qs
 
+    def get_filterset_kwargs(self, filterset_class):
+        """Inject a default qualification_status=qualified when no qualification filter is provided.
+
+        Only apply this default for the main `ProspectListView` (not for subclasses
+        like QualifiedListView/DisqualifiedListView which explicitly narrow the
+        queryset).
+        """
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        # Only apply default for the base class (avoid interfering with subclasses)
+        if self.__class__ is ProspectListView:
+            data = kwargs.get("data") or self.request.GET or {}
+            has_q = False
+            try:
+                # QueryDict supports get
+                has_q = bool(data.get("qualification_status"))
+            except Exception:
+                has_q = "qualification_status" in dict(data)
+
+            if not has_q:
+                # make mutable copy
+                try:
+                    data = data.copy()
+                except Exception:
+                    data = dict(data)
+                data["qualification_status"] = "qualified"
+                kwargs["data"] = data
+        return kwargs
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["prospect_type"] = self.kwargs.get("prospect_type", "")
@@ -124,6 +157,27 @@ class ProspectListView(ProspectsAccessMixin, FilterView):
         ctx["county_slug"] = self.kwargs.get("county", "")
         if self.kwargs.get("county"):
             ctx["county_obj"] = County.objects.filter(slug=self.kwargs["county"]).first()
+
+        # --- aggregate stats for the current filtered queryset ---
+        # Use the filtered queryset from the active FilterSet (available as `filter` in context)
+        filtered_qs = None
+        if "filter" in ctx and getattr(ctx["filter"], "qs", None) is not None:
+            filtered_qs = ctx["filter"].qs
+        else:
+            # fallback to the view queryset (may be unfiltered by GET params)
+            filtered_qs = self.get_queryset()
+
+        from django.db.models import Sum, Min, Max
+
+        ctx["stats_total"] = filtered_qs.count()
+        ctx["stats_qualified"] = filtered_qs.filter(qualification_status="qualified").count()
+        ctx["stats_surplus_sum"] = filtered_qs.aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
+
+        # first / last auction dates (based on active filters)
+        agg_dates = filtered_qs.aggregate(first_auction=Min("auction_date"), last_auction=Max("auction_date"))
+        ctx["stats_first_auction"] = agg_dates.get("first_auction")
+        ctx["stats_last_auction"] = agg_dates.get("last_auction")
+
         return ctx
 
 
@@ -139,6 +193,147 @@ class ProspectDetailView(ProspectsAccessMixin, DetailView):
             "action_logs__user",
             "rule_notes__created_by",
         )
+
+
+# -------------------- Digital Folder endpoints --------------------
+
+def _user_can_modify_documents(user, prospect):
+    if not hasattr(user, 'profile'):
+        return False
+    return user.profile.is_admin or (prospect.assigned_to and prospect.assigned_to == user)
+
+
+@login_required
+@require_http_methods(["GET"])
+def prospect_documents_list_v2(request, pk):
+    prospect = get_object_or_404(Prospect, pk=pk)
+    if not request.user.profile.can_view_prospects and not request.user.profile.is_admin:
+        return HttpResponseForbidden()
+    docs = prospect.documents.all().select_related('uploaded_by').prefetch_related('notes__created_by')
+    html = render_to_string('prospects/_documents_content_v2.html', {'docs': docs, 'object': prospect}, request=request)
+    return HttpResponse(html)
+
+
+class ProspectDocumentsPageV2View(ProspectsAccessMixin, DetailView):
+    """Dedicated Digital Folder V2 page (opens in new tab)."""
+    model = Prospect
+    template_name = 'prospects/documents_page_v2.html'
+
+    def get_queryset(self):
+        return Prospect.objects.select_related('county', 'county__state').prefetch_related('documents__uploaded_by', 'documents__notes__created_by')
+
+
+@login_required
+@require_http_methods(["POST"])
+def prospect_document_add_note(request, pk, doc_pk):
+    """Add a note to a ProspectDocument (AJAX POST).
+
+    Body form fields: content
+    Returns: JSON { created: true, note_id: <id> }
+    """
+    prospect = get_object_or_404(Prospect, pk=pk)
+    if not request.user.profile.can_view_prospects and not request.user.profile.is_admin:
+        return HttpResponseForbidden('permission denied')
+
+    doc = get_object_or_404(prospect.documents, pk=doc_pk)
+    content = (request.POST.get('content') or '').strip()
+    if not content:
+        return JsonResponse({'error': 'Content required'}, status=400)
+
+    note = doc.notes.create(content=content, created_by=request.user)
+    return JsonResponse({
+        'created': True,
+        'note': {
+            'id': note.pk,
+            'content': note.content,
+            'created_by': note.created_by.get_full_name() or note.created_by.username,
+            'created_at': note.created_at.strftime('%Y-%m-%d %H:%M'),
+        }
+    })
+
+
+@login_required
+@require_http_methods(["POST"])
+def prospect_document_delete_note(request, pk, doc_pk, note_pk):
+    """Delete a ProspectDocumentNote (admin only). Returns JSON { deleted: True }."""
+    prospect = get_object_or_404(Prospect, pk=pk)
+    if not request.user.profile.is_admin:
+        return HttpResponseForbidden('permission denied')
+    doc = get_object_or_404(prospect.documents, pk=doc_pk)
+    note = get_object_or_404(doc.notes, pk=note_pk)
+    note.delete()
+    return JsonResponse({'deleted': True})
+
+
+@login_required
+@require_http_methods(["POST"])
+def prospect_documents_upload(request, pk):
+    prospect = get_object_or_404(Prospect, pk=pk)
+    if not _user_can_modify_documents(request.user, prospect):
+        return HttpResponseForbidden('permission denied')
+
+    files = request.FILES.getlist('files')
+    if not files:
+        return JsonResponse({'error': 'No files provided'}, status=400)
+
+    created = []
+    for f in files:
+        doc = prospect.documents.create(
+            file=f,
+            name=getattr(f, 'name', '') or '',
+            uploaded_by=request.user,
+            size=getattr(f, 'size', None) or None,
+            content_type=getattr(f, 'content_type', '') or '',
+        )
+        created.append({'id': doc.pk, 'name': doc.name or doc.filename()})
+
+    return JsonResponse({'created': created}, status=201)
+
+
+@login_required
+@require_http_methods(["POST"])
+def prospect_documents_delete(request, pk):
+    prospect = get_object_or_404(Prospect, pk=pk)
+    if not _user_can_modify_documents(request.user, prospect):
+        return HttpResponseForbidden('permission denied')
+
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+        ids = payload.get('ids') or []
+    except Exception:
+        return JsonResponse({'error': 'Invalid JSON payload'}, status=400)
+
+    if not isinstance(ids, list) or not ids:
+        return JsonResponse({'error': 'No ids provided'}, status=400)
+
+    deleted = []
+    for doc in prospect.documents.filter(pk__in=ids):
+        # delete file from storage
+        try:
+            doc.file.delete(save=False)
+        except Exception:
+            pass
+        doc.delete()
+        deleted.append(doc.pk)
+
+    return JsonResponse({'deleted': deleted})
+
+
+@login_required
+@require_http_methods(["GET"])
+def prospect_document_download(request, pk, doc_pk):
+    prospect = get_object_or_404(Prospect, pk=pk)
+    doc = get_object_or_404(prospect.documents, pk=doc_pk)
+    if not (request.user.profile.can_view_prospects or request.user.profile.is_admin or doc.uploaded_by == request.user):
+        return HttpResponseForbidden()
+    # Stream file response
+    try:
+        fh = doc.file.open('rb')
+        return FileResponse(fh, as_attachment=True, filename=doc.filename())
+    except Exception:
+        return HttpResponse(status=404)
+
+# ------------------------------------------------------------------
 
 
 # --- Phase 5: Qualification Buckets ---
