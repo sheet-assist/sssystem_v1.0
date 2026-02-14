@@ -110,7 +110,15 @@
           <div class="col-sm-6">
             <p class="mb-1"><strong>State:</strong> {{ object.state|default:"-" }}</p>
             <p class="mb-1"><strong>Zip:</strong> {{ object.zip_code|default:"-" }}</p>
-            <p class="mb-1"><strong>Parcel ID:</strong> {{ object.parcel_id|default:"-" }}</p>
+            <p class="mb-1"><strong>Parcel ID:</strong>
+              {% if object.parcel_id %}
+                <a href="{% if object.parcel_url %}{{ object.parcel_url }}{% else %}https://apps.miamidadepa.gov/PropertySearch/#/?folio={{ object.parcel_id|cut:'-' }}{% endif %}"
+                   target="_blank"
+                   rel="noopener noreferrer">{{ object.parcel_id }}</a>
+              {% else %}
+                -
+              {% endif %}
+            </p>
           </div>
         </div>
       </div>
