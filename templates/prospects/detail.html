@@ -51,7 +51,10 @@
   </a>
 
   <a href="{% url 'prospects:documents_page_v2' object.pk %}" target="_blank" rel="noopener" id="openDigitalFolderV2Btn" class="btn btn-outline-success btn-sm me-1">
-    <i class="bi bi-folder2-open"></i> Digital Folder V2
+    <i class="bi bi-folder2-open"></i> Digital Folder
+    {% if object.documents.count %}
+    <span class="badge rounded-pill bg-success ms-1">{{ object.documents.count }}</span>
+    {% endif %}
   </a>
 
   {% if user.profile.is_admin %}
@@ -206,6 +209,40 @@
             <span class="badge bg-danger">Disqualified</span>
           {% else %}
             <span class="badge bg-warning text-dark">Pending</span>
+          {% endif %}
+        </p>
+        <p class="mb-1"><strong>ACK:</strong>
+          {% if object.ack_url %}
+            {% if user.profile.is_admin %}
+              <a href="{{ object.ack_url }}" target="_blank" rel="noopener" class="text-success" title="Open ACK URL">
+                <i class="bi bi-check-circle-fill fs-5"></i>
+              </a>
+            {% else %}
+              <span class="text-success" title="ACK URL available">
+                <i class="bi bi-check-circle-fill fs-5"></i>
+              </span>
+            {% endif %}
+          {% else %}
+            <span class="text-danger" title="ACK URL not available">
+              <i class="bi bi-x-circle-fill fs-5"></i>
+            </span>
+          {% endif %}
+        </p>
+        <p class="mb-1"><strong>TDM:</strong>
+          {% if object.tdm_url %}
+            {% if user.profile.is_admin %}
+              <a href="{{ object.tdm_url }}" target="_blank" rel="noopener" class="text-success" title="Open TDM URL">
+                <i class="bi bi-check-circle-fill fs-5"></i>
+              </a>
+            {% else %}
+              <span class="text-success" title="TDM URL available">
+                <i class="bi bi-check-circle-fill fs-5"></i>
+              </span>
+            {% endif %}
+          {% else %}
+            <span class="text-danger" title="TDM URL not available">
+              <i class="bi bi-x-circle-fill fs-5"></i>
+            </span>
           {% endif %}
         </p>
         <p class="mb-1"><strong>Workflow:</strong> {{ object.get_workflow_status_display }}</p>

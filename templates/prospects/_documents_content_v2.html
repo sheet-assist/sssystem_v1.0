@@ -54,7 +54,10 @@
                 <i class="bi bi-plus-lg"></i> Add note
               </button>
               <button type="button" class="btn btn-outline-primary btn-sm df2-view-notes" data-id="{{ doc.pk }}" title="View notes">
-                <i class="bi bi-chat-left-text"></i> Notes ({{ doc.notes.count }})
+                <i class="bi bi-chat-left-text"></i> Notes
+                {% if doc.notes.count %}
+                <span class="badge rounded-pill bg-primary ms-1">{{ doc.notes.count }}</span>
+                {% endif %}
               </button>
               <button type="button" class="btn btn-outline-danger btn-sm df2-delete-single" data-id="{{ doc.pk }}" title="Delete file">
                 <i class="bi bi-trash"></i>

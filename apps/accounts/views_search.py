@@ -27,7 +27,7 @@ class GlobalSearchView(LoginRequiredMixin, TemplateView):
             | Q(defendant_name__icontains=q)
             | Q(plaintiff_name__icontains=q)
             | Q(auction_item_number__icontains=q)
-        ).select_related("county", "county__state")[:50]
+        ).select_related("county", "county__state", "assigned_to")[:50]
 
         # Search cases
         ctx["cases"] = Case.objects.filter(

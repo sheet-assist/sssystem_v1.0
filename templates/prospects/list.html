@@ -128,6 +128,8 @@
         <th>Auction Date</th>
         <th class="text-end">Surplus</th>
         <th>Qualification</th>
+        <th class="text-center">ACK</th>
+        <th class="text-center">TDM</th>
         <th>Workflow</th>
         <th>Assigned To</th>
         {% if user.profile.is_admin %}
@@ -137,9 +139,27 @@
     </thead>
     <tbody>
       {% for prospect in prospect_list %}
-      <tr class="cursor-pointer" onclick="window.location='{% url 'prospects:detail' prospect.pk %}';" style="cursor:pointer;">
-        <td>{{ prospect.case_number }}</td>
-        <td>{{ prospect.parcel_id|default:"-" }}</td>
+      <tr>
+        <td>
+          <a href="{% url 'prospects:detail' prospect.pk %}" class="fw-semibold link-primary link-underline-opacity-0 link-underline-opacity-100-hover">
+            {{ prospect.case_number }}
+            <i class="bi bi-file-earmark-text ms-1 small"></i>
+          </a>
+        </td>
+        <td>
+          {% if prospect.parcel_id %}
+            <a href="{% if prospect.parcel_url %}{{ prospect.parcel_url }}{% else %}https://apps.miamidadepa.gov/PropertySearch/#/?folio={{ prospect.parcel_id|cut:'-' }}{% endif %}"
+               class="link-primary link-underline-opacity-0 link-underline-opacity-100-hover fw-medium"
+               target="_blank"
+               rel="noopener"
+              onclick="event.stopPropagation();">
+              {{ prospect.parcel_id }}
+              <i class="bi bi-globe2 ms-1 small"></i>
+            </a>
+          {% else %}
+            -
+          {% endif %}
+        </td>
         <td>
           {% if prospect.property_address or prospect.city or prospect.zip_code %}
             <div>{{ prospect.property_address|default:"" }}</div>
@@ -159,6 +179,40 @@
             <span class="badge bg-danger">Disqualified</span>
           {% else %}
             <span class="badge bg-warning text-dark">Pending</span>
+          {% endif %}
+        </td>
+        <td class="text-center">
+          {% if prospect.ack_url %}
+            {% if user.profile.is_admin %}
+              <a href="{{ prospect.ack_url }}" target="_blank" rel="noopener" onclick="event.stopPropagation();" class="text-success" title="Open ACK URL">
+                <i class="bi bi-check-circle-fill fs-5"></i>
+              </a>
+            {% else %}
+              <span class="text-success" title="ACK URL available">
+                <i class="bi bi-check-circle-fill fs-5"></i>
+              </span>
+            {% endif %}
+          {% else %}
+            <span class="text-danger" title="ACK URL not available">
+              <i class="bi bi-x-circle-fill fs-5"></i>
+            </span>
+          {% endif %}
+        </td>
+        <td class="text-center">
+          {% if prospect.tdm_url %}
+            {% if user.profile.is_admin %}
+              <a href="{{ prospect.tdm_url }}" target="_blank" rel="noopener" onclick="event.stopPropagation();" class="text-success" title="Open TDM URL">
+                <i class="bi bi-check-circle-fill fs-5"></i>
+              </a>
+            {% else %}
+              <span class="text-success" title="TDM URL available">
+                <i class="bi bi-check-circle-fill fs-5"></i>
+              </span>
+            {% endif %}
+          {% else %}
+            <span class="text-danger" title="TDM URL not available">
+              <i class="bi bi-x-circle-fill fs-5"></i>
+            </span>
           {% endif %}
         </td>
         <td>
@@ -202,7 +256,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="{% if user.profile.is_admin %}9{% else %}8{% endif %}" class="text-center text-muted py-4">No prospects found.</td>
+        <td colspan="{% if user.profile.is_admin %}11{% else %}10{% endif %}" class="text-center text-muted py-4">No prospects found.</td>
       </tr>
       {% endfor %}
     </tbody>

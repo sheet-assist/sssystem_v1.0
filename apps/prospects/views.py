@@ -4,7 +4,8 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.db.models import Count, Q
+from django.core.paginator import Paginator
+from django.db.models import Count, Q, Min, Max, Sum
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -34,6 +35,57 @@ class TypeSelectView(ProspectsAccessMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["types"] = Prospect.PROSPECT_TYPES
+        type_stats = {
+            row["prospect_type"]: row
+            for row in Prospect.objects.values("prospect_type").annotate(
+                total_count=Count("id"),
+                qualified_count=Count("id", filter=Q(qualification_status="qualified")),
+                first_auction=Min("auction_date"),
+                last_auction=Max("auction_date"),
+                total_surplus=Sum("surplus_amount"),
+            )
+        }
+        ctx["type_cards"] = [
+            {
+                "code": code,
+                "label": label,
+                "total_count": type_stats.get(code, {}).get("total_count", 0),
+                "qualified_count": type_stats.get(code, {}).get("qualified_count", 0),
+                "first_auction": type_stats.get(code, {}).get("first_auction"),
+                "last_auction": type_stats.get(code, {}).get("last_auction"),
+                "total_surplus": type_stats.get(code, {}).get("total_surplus") or 0,
+            }
+            for code, label in Prospect.PROSPECT_TYPES
+        ]
+        type_codes = {code for code, _label in Prospect.PROSPECT_TYPES}
+        selected_type = (self.request.GET.get("prospect_type") or "").upper()
+        if selected_type not in type_codes:
+            selected_type = ""
+
+        prospect_qs = Prospect.objects.select_related("county", "county__state", "assigned_to")
+        if selected_type:
+            prospect_qs = prospect_qs.filter(prospect_type=selected_type)
+
+        filter_data = self.request.GET.copy()
+        if not filter_data.get("qualification_status"):
+            filter_data["qualification_status"] = "qualified"
+
+        prospect_filter = ProspectFilter(filter_data, queryset=prospect_qs)
+        filtered_prospects = prospect_filter.qs.order_by("-auction_date", "-created_at")
+        paginator = Paginator(filtered_prospects, 25)
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+        has_active_filters = any(k != "page" and bool(v) for k, v in self.request.GET.items())
+        filtered_surplus = prospect_filter.qs.aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
+
+        ctx["selected_prospect_type"] = selected_type
+        ctx["filter"] = prospect_filter
+        ctx["prospect_list"] = page_obj.object_list
+        ctx["page_obj"] = page_obj
+        ctx["paginator"] = paginator
+        ctx["is_paginated"] = page_obj.has_other_pages()
+        ctx["has_active_filters"] = has_active_filters
+        ctx["filtered_total"] = prospect_filter.qs.count()
+        ctx["filtered_surplus"] = filtered_surplus
         return ctx
 
 
@@ -56,16 +108,50 @@ class StateSelectView(ProspectsAccessMixin, ListView):
                 ),
                 distinct=True,
             ),
+            first_auction=Min(
+                "counties__prospects__auction_date",
+                filter=Q(counties__prospects__prospect_type=self.kwargs["prospect_type"]),
+            ),
+            last_auction=Max(
+                "counties__prospects__auction_date",
+                filter=Q(counties__prospects__prospect_type=self.kwargs["prospect_type"]),
+            ),
+            total_surplus=Sum(
+                "counties__prospects__surplus_amount",
+                filter=Q(counties__prospects__prospect_type=self.kwargs["prospect_type"]),
+            ),
         )
-        if self.request.GET.get("show_all") != "1":
-            qs = qs.filter(total_count__gt=0)
+        qs = qs.filter(total_count__gt=0)
         return qs.order_by("-qualified_count", "-total_count", "name").distinct()
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["prospect_type"] = self.kwargs["prospect_type"]
         ctx["type_display"] = dict(Prospect.PROSPECT_TYPES).get(self.kwargs["prospect_type"], "")
-        ctx["show_all"] = self.request.GET.get("show_all") == "1"
+
+        prospect_qs = Prospect.objects.filter(
+            prospect_type=self.kwargs["prospect_type"]
+        ).select_related("county", "county__state", "assigned_to")
+
+        filter_data = self.request.GET.copy()
+        if not filter_data.get("qualification_status"):
+            filter_data["qualification_status"] = "qualified"
+
+        prospect_filter = ProspectFilter(filter_data, queryset=prospect_qs)
+        filtered_prospects = prospect_filter.qs.order_by("-auction_date", "-created_at")
+        paginator = Paginator(filtered_prospects, 25)
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+        has_active_filters = any(k != "page" and bool(v) for k, v in self.request.GET.items())
+        filtered_surplus = prospect_filter.qs.aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
+
+        ctx["filter"] = prospect_filter
+        ctx["prospect_list"] = page_obj.object_list
+        ctx["page_obj"] = page_obj
+        ctx["paginator"] = paginator
+        ctx["is_paginated"] = page_obj.has_other_pages()
+        ctx["has_active_filters"] = has_active_filters
+        ctx["filtered_total"] = prospect_filter.qs.count()
+        ctx["filtered_surplus"] = filtered_surplus
         return ctx
 
 
@@ -86,19 +172,57 @@ class CountySelectView(ProspectsAccessMixin, ListView):
                     prospects__qualification_status="qualified",
                 ),
             ),
+            first_auction=Min(
+                "prospects__auction_date",
+                filter=Q(prospects__prospect_type=self.kwargs["prospect_type"]),
+            ),
+            last_auction=Max(
+                "prospects__auction_date",
+                filter=Q(prospects__prospect_type=self.kwargs["prospect_type"]),
+            ),
+            total_surplus=Sum(
+                "prospects__surplus_amount",
+                filter=Q(prospects__prospect_type=self.kwargs["prospect_type"]),
+            ),
         )
-
-        if self.request.GET.get("show_all") != "1":
-            qs = qs.filter(total_count__gt=0)
-
+        qs = qs.filter(total_count__gt=0)
         return qs.order_by("-qualified_count", "-total_count", "name")
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["prospect_type"] = self.kwargs["prospect_type"]
         ctx["type_display"] = dict(Prospect.PROSPECT_TYPES).get(self.kwargs["prospect_type"], "")
-        ctx["state_abbr"] = self.kwargs["state"].upper()
-        ctx["show_all"] = self.request.GET.get("show_all") == "1"
+        state_abbr = self.kwargs["state"].upper()
+        ctx["state_abbr"] = state_abbr
+
+        selected_state = State.objects.filter(abbreviation__iexact=self.kwargs["state"]).first()
+
+        prospect_qs = Prospect.objects.filter(
+            prospect_type=self.kwargs["prospect_type"],
+            county__state__abbreviation__iexact=self.kwargs["state"],
+        ).select_related("county", "county__state", "assigned_to")
+
+        filter_data = self.request.GET.copy()
+        if not filter_data.get("qualification_status"):
+            filter_data["qualification_status"] = "qualified"
+        if selected_state and not filter_data.get("state"):
+            filter_data["state"] = str(selected_state.pk)
+
+        prospect_filter = ProspectFilter(filter_data, queryset=prospect_qs)
+        filtered_prospects = prospect_filter.qs.order_by("-auction_date", "-created_at")
+        paginator = Paginator(filtered_prospects, 25)
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+        has_active_filters = any(k != "page" and bool(v) for k, v in self.request.GET.items())
+        filtered_surplus = prospect_filter.qs.aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
+
+        ctx["filter"] = prospect_filter
+        ctx["prospect_list"] = page_obj.object_list
+        ctx["page_obj"] = page_obj
+        ctx["paginator"] = paginator
+        ctx["is_paginated"] = page_obj.has_other_pages()
+        ctx["has_active_filters"] = has_active_filters
+        ctx["filtered_total"] = prospect_filter.qs.count()
+        ctx["filtered_surplus"] = filtered_surplus
         return ctx
 
 

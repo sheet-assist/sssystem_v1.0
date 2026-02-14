@@ -16,6 +16,13 @@
     <div class="collapse navbar-collapse" id="mainNav">
       {% if user.is_authenticated %}
       <ul class="navbar-nav me-auto">
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.app_name == 'dashboard' %}active{% endif %}"
+             href="{% url 'dashboard:home' %}">
+            <i class="bi bi-speedometer2"></i> Dashboard
+          </a>
+        </li>
+
         {% if user.profile.can_view_prospects or user.is_superuser %}
         <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.app_name == 'prospects' %}active{% endif %}"
