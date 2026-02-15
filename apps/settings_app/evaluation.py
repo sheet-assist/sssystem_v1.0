@@ -169,6 +169,7 @@ def evaluate_prospect(prospect_data, county):
       - auction status
     """
     prospect_type = prospect_data.get("prospect_type", "TD")
+    print(f"Evaluating prospect of type '{prospect_type}' for county '{county}' with auction date {prospect_data.get('auction_date')}")
     auction_date = prospect_data.get("auction_date")
     rules = get_applicable_rules(prospect_type, county, auction_date=auction_date)
 

@@ -656,6 +656,31 @@ class ScrapeJobRunView(AdminRequiredMixin, DetailView):
         return redirect("scraper:job_detail", pk=job.pk)
 
 
+class ScrapeJobUpdateView(AdminRequiredMixin, UpdateView):
+    """Update an existing scrape job"""
+    model = ScrapeJob
+    form_class = ScrapeJobForm
+    template_name = "scraper/job_form.html"
+    
+    def form_valid(self, form):
+        messages.success(self.request, f"Scrape job #{self.object.pk} updated successfully.")
+        return super().form_valid(form)
+    
+    def get_success_url(self):
+        return reverse("scraper:job_detail", kwargs={"pk": self.object.pk})
+
+
+class ScrapeJobDeleteView(AdminRequiredMixin, DeleteView):
+    """Delete a scrape job"""
+    model = ScrapeJob
+    template_name = "scraper/job_confirm_delete.html"
+    success_url = reverse_lazy("scraper:job_list")
+    
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, f"Scrape job #{self.get_object().pk} deleted successfully.")
+        return super().delete(request, *args, **kwargs)
+
+
 # ============================================================================
 # PHASE 2: API ENDPOINTS FOR JOB STATUS POLLING & ASYNC EXECUTION
 # ============================================================================

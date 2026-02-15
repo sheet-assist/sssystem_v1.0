@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Edit Scrape Job{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <h2>Edit Scrape Job</h2>
+    <div class="card">
+      <div class="card-body">
+        <form method="post" id="scrape-job-form" novalidate>
+          {% csrf_token %}
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger">{{ form.non_field_errors.0 }}</div>
+          {% endif %}
+
+          {% if form.fields.counties %}
+          <div class="mb-3">
+            <label for="id_name" class="form-label">{{ form.name.label }}</label>
+            {{ form.name }}
+            <small class="text-muted">Jobs sharing the same name will be grouped together in the list.</small>
+            {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors.0 }}</div>{% endif %}
+          </div>
+
+          {% url 'scraper:counties_ajax_api' '__STATE__' as counties_url_template %}
+          {% with selected_state=form.state.value|stringformat:"s"|default_if_none:'' %}
+          <div class="mb-3">
+            <label for="id_state" class="form-label">Select State</label>
+            <select
+              name="{{ form.state.html_name }}"
+              id="id_state"
+              class="form-select"
+              data-counties-url-template="{{ counties_url_template }}"
+            >
+              <option value="">-- Choose a state --</option>
+              {% for state in form.fields.state.queryset %}
+                {% with option_value=state.pk|stringformat:"s" %}
+                <option value="{{ option_value }}" data-state-code="{{ state.abbreviation }}" {% if option_value == selected_state %}selected{% endif %}>{{ state.name }} ({{ state.abbreviation }})</option>
+                {% endwith %}
+              {% endfor %}
+            </select>
+            {% if form.state.errors %}<div class="text-danger small">{{ form.state.errors.0 }}</div>{% endif %}
+          </div>
+          {% endwith %}
+
+          <div class="mb-3">
+            <label for="id_counties" class="form-label">Select Counties</label>
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+              <div class="flex-grow-1">
+                <input type="search" class="form-control form-control-sm" id="counties-filter" placeholder="Search counties" autocomplete="off">
+              </div>
+              <div class="btn-group btn-group-sm flex-shrink-0" role="group" aria-label="County selection helpers">
+                <button type="button" class="btn btn-outline-primary" id="select-all-counties">Select All</button>
+                <button type="button" class="btn btn-outline-secondary" id="clear-all-counties">Clear</button>
+              </div>
+            </div>
+            <div id="counties-summary" class="badge bg-light text-dark mb-2">Select a state to load counties.</div>
+            <div id="counties-chips" class="d-flex flex-wrap gap-1 mb-2 visually-hidden"></div>
+            {{ form.counties }}
+            <div id="counties-status" class="small text-muted mt-1">Select a state to load counties.</div>
+            <small class="text-muted d-block mt-1">Hold Ctrl/Command while clicking to select multiple counties.</small>
+            {% if form.counties.errors %}<div class="text-danger small">{{ form.counties.errors.0 }}</div>{% endif %}
+          </div>
+
+          {% if form.fields.job_type %}
+          <div class="mb-3">
+            <label for="id_job_type" class="form-label">{{ form.job_type.label }}</label>
+            {{ form.job_type }}
+            {% if form.job_type.errors %}<div class="text-danger small">{{ form.job_type.errors.0 }}</div>{% endif %}
+          </div>
+          {% endif %}
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="id_target_date" class="form-label">{{ form.target_date.label }}</label>
+              {{ form.target_date }}
+              {% if form.target_date.errors %}<div class="text-danger small">{{ form.target_date.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="id_end_date" class="form-label">{{ form.end_date.label }}</label>
+              {{ form.end_date }}
+              <small class="text-muted">Leave blank for a single date.</small>
+              {% if form.end_date.errors %}<div class="text-danger small">{{ form.end_date.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+          {% else %}
+          <div class="alert alert-info">Please complete the required fields below.</div>
+          {{ form.as_p }}
+          {% endif %}
+
+          <button type="submit" class="btn btn-primary">Update Job</button>
+          <a href="{% url 'scraper:job_detail' object.pk %}" class="btn btn-secondary">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if form.fields.counties %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const stateSelect = document.getElementById('id_state');
+  const countiesSelect = document.getElementById('id_counties');
+  const countiesFilter = document.getElementById('counties-filter');
+  const selectAllBtn = document.getElementById('select-all-counties');
+  const clearAllBtn = document.getElementById('clear-all-counties');
+  const countiesSummary = document.getElementById('counties-summary');
+  const countiesChips = document.getElementById('counties-chips');
+  const countiesStatus = document.getElementById('counties-status');
+  const countriesUrlTemplate = stateSelect.dataset.countiesUrlTemplate;
+
+  function updateCountiesSummary() {
+    const selected = Array.from(countiesSelect.selectedOptions);
+    countiesSummary.textContent = `${selected.length} county/counties selected`;
+    countiesChips.innerHTML = selected.map(opt => `<span class="badge bg-primary">${opt.text}</span>`).join('');
+  }
+
+  stateSelect.addEventListener('change', async function() {
+    const stateCode = stateSelect.options[stateSelect.selectedIndex]?.dataset.stateCode;
+    if (!stateCode) {
+      countiesSelect.innerHTML = '<option value="">-- Select a state first --</option>';
+      countiesStatus.textContent = 'Select a state to load counties.';
+      return;
+    }
+
+    // Preserve currently selected county values before updating
+    const previouslySelected = new Set(
+      Array.from(countiesSelect.selectedOptions).map(opt => opt.value)
+    );
+
+    const url = countriesUrlTemplate.replace('__STATE__', stateCode);
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      countiesSelect.innerHTML = data.counties.map(c => 
+        `<option value="${c.id}" ${previouslySelected.has(String(c.id)) ? 'selected' : ''}>${c.name}</option>`
+      ).join('');
+      updateCountiesSummary();
+      countiesStatus.textContent = `${data.counties.length} counties available`;
+    } catch (e) {
+      countiesStatus.textContent = 'Error loading counties';
+    }
+  });
+
+  countiesSelect.addEventListener('change', updateCountiesSummary);
+
+  countiesFilter.addEventListener('input', function() {
+    const filter = this.value.toLowerCase();
+    Array.from(countiesSelect.options).forEach(opt => {
+      opt.hidden = !opt.text.toLowerCase().includes(filter);
+    });
+  });
+
+  selectAllBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    Array.from(countiesSelect.options).forEach(opt => {
+      if (!opt.hidden) opt.selected = true;
+    });
+    countiesSelect.dispatchEvent(new Event('change'));
+  });
+
+  clearAllBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    Array.from(countiesSelect.options).forEach(opt => opt.selected = false);
+    countiesSelect.dispatchEvent(new Event('change'));
+  });
+
+  updateCountiesSummary();
+  if (stateSelect.value) {
+    stateSelect.dispatchEvent(new Event('change'));
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

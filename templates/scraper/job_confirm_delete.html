@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Delete Scrape Job{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card border-danger">
+      <div class="card-header bg-danger text-white">
+        <h5 class="mb-0">Delete Scrape Job</h5>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-warning" role="alert">
+          <strong>Warning:</strong> This action cannot be undone.
+        </div>
+
+        <p>Are you sure you want to delete this scrape job?</p>
+
+        <div class="card mb-3 bg-light">
+          <div class="card-body">
+            <p class="mb-2">
+              <strong>Job Name:</strong> {{ object.name|default:"(Untitled)" }}
+            </p>
+            <p class="mb-2">
+              <strong>County:</strong> {{ object.county.name }}, {{ object.county.state.abbreviation }}
+            </p>
+            <p class="mb-2">
+              <strong>Type:</strong> {{ object.get_job_type_display }}
+            </p>
+            <p class="mb-2">
+              <strong>Status:</strong> 
+              {% if object.status == "completed" %}
+                <span class="badge bg-success">Completed</span>
+              {% elif object.status == "running" %}
+                <span class="badge bg-warning text-dark">Running</span>
+              {% elif object.status == "failed" %}
+                <span class="badge bg-danger">Failed</span>
+              {% else %}
+                <span class="badge bg-secondary">Pending</span>
+              {% endif %}
+            </p>
+            <p class="mb-0">
+              <strong>Target Date:</strong> {{ object.target_date|date:"Y-m-d" }}
+              {% if object.end_date %}to {{ object.end_date|date:"Y-m-d" }}{% endif %}
+            </p>
+          </div>
+        </div>
+
+        <form method="post" class="d-inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger">Delete Job</button>
+          <a href="{% url 'scraper:job_detail' object.pk %}" class="btn btn-secondary">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

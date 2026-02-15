@@ -333,13 +333,20 @@ class ScrapeJobForm(forms.ModelForm):
         state_value = self.data.get("state") or self.initial.get("state")
         state_obj = None
 
-        if isinstance(state_value, State):
-            state_obj = state_value
-        elif state_value:
-            try:
-                state_obj = State.objects.get(pk=state_value)
-            except (State.DoesNotExist, ValueError):
-                state_obj = None
+        # If editing an instance, load the state from the instance's county
+        if self.instance.pk and not state_value:
+            if hasattr(self.instance, "county") and self.instance.county:
+                state_obj = self.instance.county.state
+                # Set the initial value for the state field
+                self.fields["state"].initial = state_obj
+        else:
+            if isinstance(state_value, State):
+                state_obj = state_value
+            elif state_value:
+                try:
+                    state_obj = State.objects.get(pk=state_value)
+                except (State.DoesNotExist, ValueError):
+                    state_obj = None
 
         if state_obj is None and hasattr(self.instance, "county") and self.instance.pk:
             state_obj = self.instance.county.state
@@ -349,6 +356,12 @@ class ScrapeJobForm(forms.ModelForm):
                 is_active=True,
                 state=state_obj,
             ).order_by("name")
+            
+            # If editing, pre-populate the counties field with the current county
+            if self.instance.pk and not self.data.get("counties"):
+                if self.instance.county:
+                    self.fields["counties"].initial = [self.instance.county]
+            
             self.fields["counties"].widget.attrs.pop("disabled", None)
         else:
             self.fields["counties"].queryset = County.objects.none()

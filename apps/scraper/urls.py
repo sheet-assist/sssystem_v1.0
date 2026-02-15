@@ -45,6 +45,8 @@ urlpatterns = [
     path("jobs/group/<int:pk>/", views.ScrapeJobGroupDetailView.as_view(), name="job_group_detail"),
     path("jobs/<int:pk>/", views.ScrapeJobDetailView.as_view(), name="job_detail"),
     path("jobs/<int:pk>/run/", views.ScrapeJobRunView.as_view(), name="job_run"),
+    path("jobs/<int:pk>/edit/", views.ScrapeJobUpdateView.as_view(), name="job_update"),
+    path("jobs/<int:pk>/delete/", views.ScrapeJobDeleteView.as_view(), name="job_delete"),
 
     # ====================================================================
     # COUNTY SCRAPE URL MANAGEMENT

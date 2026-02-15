@@ -37,7 +37,7 @@
           <th class="text-end">Failed Count</th>
           <th class="text-end">Runs</th>
           <th>Last Created</th>
-          <th></th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -62,7 +62,11 @@
             <td>{{ group.latest_created|date:"Y-m-d H:i" }}</td>
             <td class="text-end">
               {% if group.job_pk %}
-              <a href="{% url 'scraper:job_group_detail' group.job_pk %}" class="btn btn-sm btn-outline-primary">View Jobs</a>
+              <a href="{% url 'scraper:job_group_detail' group.job_pk %}" class="btn btn-sm btn-outline-primary">View</a>
+              {% if user.is_staff %}
+                <a href="{% url 'scraper:job_update' group.job_pk %}" class="btn btn-sm btn-outline-warning">Edit</a>
+                <a href="{% url 'scraper:job_delete' group.job_pk %}" class="btn btn-sm btn-outline-danger">Delete</a>
+              {% endif %}
               {% endif %}
             </td>
           </tr>

@@ -110,7 +110,7 @@ def persist_scraped_data(job, scraped_items):
                 "source_url": data.get("source_url", ""),
                 "raw_data": data.get("raw_data", {}),
                 "opening_bid": opening_bid_value,
-                "qualification_status": "pending",
+                "qualification_status": "Pending",
             }
             # sold_data = data.get("sold_to", "")
             # print(f"Upserting prospect with sold to-----------------------: {sold_data}")
@@ -139,6 +139,7 @@ def persist_scraped_data(job, scraped_items):
                     "plaintiff_max_bid",
                     "auction_type",
                     "opening_bid",
+                   
                 ):
                     if field == "sale_amount":
                         val = sale_amount_value
@@ -156,10 +157,11 @@ def persist_scraped_data(job, scraped_items):
                 prospect.save()
                 updated += 1
 
-            is_qualified, reasons = evaluate_prospect(data, county)
-            prospect.qualification_status = "qualified" if is_qualified else "disqualified"
-            prospect.save(update_fields=["qualification_status"])
-
+            # is_qualified, reasons = evaluate_prospect(data, county)
+            # prospect.qualification_status = "qualified" if is_qualified else "disqualified"
+            # prospect.save(update_fields=["qualification_status"])
+            is_qualified = False
+            reasons="Defaulting to disqualified until we can debug evaluation logic with real data"
             if is_qualified:
                 qualified_count += 1
                 add_rule_note(
