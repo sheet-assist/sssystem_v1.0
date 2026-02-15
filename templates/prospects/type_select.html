@@ -105,7 +105,7 @@
 
 <div class="card mt-4 mb-3">
   <div class="card-body">
-    <form method="get" id="type-select-filter-form" class="row g-1 align-items-end compact-filter flex-wrap flex-lg-nowrap">
+    <form method="get" id="type-select-filter-form" class="row g-1 align-items-end compact-filter">
       <div class="col-auto">
         <label class="form-label form-label-sm mb-1">{{ filter.form.qualification_status.label }}</label>
         {{ filter.form.qualification_status }}
@@ -135,7 +135,7 @@
       </div>
       {% endif %}
       {% endfor %}
-      <div class="col-auto">
+      <div class="col-12 mt-1">
         <button class="btn btn-sm btn-primary" type="submit">
           <i class="bi bi-funnel"></i> Filter
         </button>
