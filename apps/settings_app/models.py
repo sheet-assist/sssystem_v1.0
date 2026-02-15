@@ -180,6 +180,16 @@ class SSRevenueSetting(models.Model):
     ]
 
     tier_percent = models.PositiveSmallIntegerField(choices=TIER_CHOICES, default=15)
+    ARS_TIER_CHOICES = [
+        (1, "1%"),
+        (3, "3%"),
+        (5, "5%"),
+        (7, "7%"),
+        (8, "8%"),
+        (9, "9%"),
+        (10, "10%"),
+    ]
+    ars_tier_percent = models.PositiveSmallIntegerField(choices=ARS_TIER_CHOICES, default=5)
     updated_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="updated_ss_revenue_settings"
     )
@@ -190,9 +200,12 @@ class SSRevenueSetting(models.Model):
         verbose_name_plural = "SS Revenue Settings"
 
     def __str__(self):
-        return f"SS Revenue Tier: {self.tier_percent}%"
+        return f"SS Revenue Tier: {self.tier_percent}% | ARS Tier: {self.ars_tier_percent}%"
 
     @classmethod
     def get_solo(cls):
-        obj, _ = cls.objects.get_or_create(pk=1, defaults={"tier_percent": 15})
+        obj, _ = cls.objects.get_or_create(
+            pk=1,
+            defaults={"tier_percent": 15, "ars_tier_percent": 5},
+        )
         return obj

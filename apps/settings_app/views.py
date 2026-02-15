@@ -26,7 +26,9 @@ class SettingsHomeView(AdminRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["criteria_count"] = FilterCriteria.objects.filter(is_active=True).count()
-        ctx["ss_revenue_tier"] = SSRevenueSetting.get_solo().tier_percent
+        setting = SSRevenueSetting.get_solo()
+        ctx["ss_revenue_tier"] = setting.tier_percent
+        ctx["ars_tier_percent"] = setting.ars_tier_percent
         return ctx
 
 
@@ -102,9 +104,17 @@ class FinanceSettingsView(FinanceSettingsAccessMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         setting = SSRevenueSetting.get_solo()
         ctx["current_tier"] = setting.tier_percent
-        ctx["form"] = SSRevenueTierForm(initial={"tier_percent": str(setting.tier_percent)})
+        ctx["current_ars_tier"] = setting.ars_tier_percent
+        ctx["form"] = SSRevenueTierForm(
+            initial={
+                "tier_percent": str(setting.tier_percent),
+                "ars_tier_percent": str(setting.ars_tier_percent),
+            }
+        )
         ctx["tier_choices"] = SSRevenueSetting.TIER_CHOICES
+        ctx["ars_tier_choices"] = SSRevenueSetting.ARS_TIER_CHOICES
         ctx["selected_tier"] = str(setting.tier_percent)
+        ctx["selected_ars_tier"] = str(setting.ars_tier_percent)
         return ctx
 
     def post(self, request, *args, **kwargs):
@@ -113,12 +123,21 @@ class FinanceSettingsView(FinanceSettingsAccessMixin, TemplateView):
             ctx = self.get_context_data(**kwargs)
             ctx["form"] = form
             ctx["tier_choices"] = SSRevenueSetting.TIER_CHOICES
+            ctx["ars_tier_choices"] = SSRevenueSetting.ARS_TIER_CHOICES
             ctx["selected_tier"] = request.POST.get("tier_percent", "15")
+            ctx["selected_ars_tier"] = request.POST.get("ars_tier_percent", "5")
             return self.render_to_response(ctx)
 
         setting = SSRevenueSetting.get_solo()
         setting.tier_percent = int(form.cleaned_data["tier_percent"])
+        setting.ars_tier_percent = int(form.cleaned_data["ars_tier_percent"])
         setting.updated_by = request.user
-        setting.save(update_fields=["tier_percent", "updated_by", "updated_at"])
-        messages.success(request, f"SS Revenue Tier updated to {setting.tier_percent}%.")
+        setting.save(update_fields=["tier_percent", "ars_tier_percent", "updated_by", "updated_at"])
+        messages.success(
+            request,
+            (
+                f"SS Revenue Tier updated to {setting.tier_percent}% "
+                f"and ARS Tier updated to {setting.ars_tier_percent}%."
+            ),
+        )
         return redirect("settings_app:finance")

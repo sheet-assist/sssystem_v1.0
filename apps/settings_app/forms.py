@@ -162,3 +162,9 @@ class SSRevenueTierForm(forms.Form):
         initial="15",
         label="SS Revenue Tier",
     )
+    ars_tier_percent = forms.ChoiceField(
+        choices=SSRevenueSetting.ARS_TIER_CHOICES,
+        widget=forms.RadioSelect,
+        initial="5",
+        label="ARS Tiers Payout",
+    )
