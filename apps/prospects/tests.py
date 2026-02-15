@@ -136,6 +136,49 @@ class NavigationFlowTest(ProspectTestMixin, TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Tax Deed")
 
+    def test_type_select_export_excel(self):
+        resp = self.client.get("/prospects/?export=excel")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/vnd.ms-excel")
+        self.assertIn("attachment; filename=", resp["Content-Disposition"])
+        self.assertIn(b"<Workbook", resp.content)
+        self.assertIn(b"2024-001234", resp.content)
+
+    def test_type_select_defaults_to_qualified(self):
+        Prospect.objects.create(
+            prospect_type="TD",
+            case_number="2024-DQ-TYPE",
+            county=self.county,
+            auction_date=date(2024, 6, 18),
+            qualification_status="disqualified",
+        )
+        resp = self.client.get("/prospects/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "2024-001234")
+        self.assertNotContains(resp, "2024-DQ-TYPE")
+        self.assertContains(resp, "Qualified Status")
+        self.assertContains(resp, "<option value=\"qualified\" selected>")
+
+    def test_type_select_clear_returns_all_statuses(self):
+        Prospect.objects.create(
+            prospect_type="TD",
+            case_number="2024-DQ-CLEAR",
+            county=self.county,
+            auction_date=date(2024, 6, 19),
+            qualification_status="disqualified",
+        )
+
+        filtered = self.client.get("/prospects/?qualification_status=qualified")
+        self.assertEqual(filtered.status_code, 200)
+        self.assertContains(filtered, "2024-001234")
+        self.assertNotContains(filtered, "2024-DQ-CLEAR")
+
+        # Clear submits empty values for all filters, including qualification_status.
+        cleared = self.client.get("/prospects/?qualification_status=")
+        self.assertEqual(cleared.status_code, 200)
+        self.assertContains(cleared, "2024-001234")
+        self.assertContains(cleared, "2024-DQ-CLEAR")
+
     def test_state_select_page(self):
         other_state = State.objects.create(name="Georgia", abbreviation="GA")
         County.objects.create(
@@ -186,6 +229,14 @@ class NavigationFlowTest(ProspectTestMixin, TestCase):
         resp = self.client.get("/prospects/browse/TD/FL/miami-dade/")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "2024-001234")
+
+    def test_prospect_list_export_excel(self):
+        resp = self.client.get("/prospects/browse/TD/FL/miami-dade/?export=excel")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/vnd.ms-excel")
+        self.assertIn("attachment; filename=", resp["Content-Disposition"])
+        self.assertIn(b"<Workbook", resp.content)
+        self.assertIn(b"2024-001234", resp.content)
 
     def test_prospect_detail_page(self):
         resp = self.client.get(f"/prospects/detail/{self.prospect.pk}/")

@@ -6,6 +6,18 @@ from .models import Prospect
 
 
 class ProspectFilter(django_filters.FilterSet):
+    qualification_status = django_filters.ChoiceFilter(
+        field_name="qualification_status",
+        choices=Prospect.QUALIFICATION_STATUS,
+        label="Qualified Status",
+        empty_label="All",
+    )
+    workflow_status = django_filters.ChoiceFilter(
+        field_name="workflow_status",
+        choices=Prospect.WORKFLOW_STATUS,
+        label="Status",
+        empty_label="All",
+    )
     state = django_filters.ModelChoiceFilter(
         field_name="county__state",
         queryset=State.objects.filter(is_active=True).order_by("name"),

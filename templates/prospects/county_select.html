@@ -105,18 +105,35 @@
 
 <div class="card mt-4 mb-3">
   <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
+    <form method="get" id="county-select-filter-form" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label form-label-sm mb-1">{{ filter.form.qualification_status.label }}</label>
+        {{ filter.form.qualification_status }}
+      </div>
+      <div class="col-auto">
+        <label class="form-label form-label-sm mb-1">{{ filter.form.state.label }}</label>
+        {{ filter.form.state }}
+      </div>
+      <div class="col-auto">
+        <label class="form-label form-label-sm mb-1">{{ filter.form.county.label }}</label>
+        {{ filter.form.county }}
+      </div>
       {% for field in filter.form %}
+      {% if field.name != "qualification_status" and field.name != "state" and field.name != "county" %}
       <div class="col-auto">
         <label class="form-label form-label-sm mb-1">{{ field.label }}</label>
         {{ field }}
       </div>
+      {% endif %}
       {% endfor %}
       <div class="col-auto">
         <button class="btn btn-sm btn-primary" type="submit">
           <i class="bi bi-funnel"></i> Filter
         </button>
-        <a href="{% url 'prospects:county_select' prospect_type state_abbr %}" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
+        <button id="clear-county-select-filters" class="btn btn-sm btn-outline-secondary ms-1" type="button">Clear</button>
+        <a class="btn btn-sm btn-outline-success ms-1" href="?{% for k,v in request.GET.items %}{% if k != 'page' and k != 'export' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}export=excel">
+          <i class="bi bi-file-earmark-excel"></i> Export Excel
+        </a>
       </div>
     </form>
   </div>
@@ -155,7 +172,7 @@
         <th>Auction Date</th>
         <th class="text-end d-none d-lg-table-cell">Surplus</th>
         <th>Qualification</th>
-        <th class="text-center d-none d-lg-table-cell">ACK</th>
+        <th class="text-center d-none d-lg-table-cell">AC</th>
         <th class="text-center d-none d-lg-table-cell">TDM</th>
         <th class="d-none d-xl-table-cell">Workflow</th>
       </tr>
@@ -208,16 +225,16 @@
         <td class="text-center d-none d-lg-table-cell">
           {% if prospect.ack_url %}
             {% if user.profile.is_admin %}
-              <a href="{{ prospect.ack_url }}" target="_blank" rel="noopener" class="text-success" title="Open ACK URL">
+              <a href="{{ prospect.ack_url }}" target="_blank" rel="noopener" class="text-success" title="Open AC URL">
                 <i class="bi bi-check-circle-fill fs-5"></i>
               </a>
             {% else %}
-              <span class="text-success" title="ACK URL available">
+              <span class="text-success" title="AC URL available">
                 <i class="bi bi-check-circle-fill fs-5"></i>
               </span>
             {% endif %}
           {% else %}
-            <span class="text-danger" title="ACK URL not available">
+            <span class="text-danger" title="AC URL not available">
               <i class="bi bi-x-circle-fill fs-5"></i>
             </span>
           {% endif %}
@@ -276,15 +293,34 @@
   (function () {
     const input = document.getElementById("countySearchInput");
     const items = Array.from(document.querySelectorAll("#countyCardsGrid .searchable-item"));
-    if (!input || !items.length) return;
-
-    input.addEventListener("input", function () {
-      const q = input.value.trim().toLowerCase();
-      items.forEach(function (item) {
-        const text = item.getAttribute("data-search-text") || "";
-        item.style.display = text.includes(q) ? "" : "none";
+    if (input && items.length) {
+      input.addEventListener("input", function () {
+        const q = input.value.trim().toLowerCase();
+        items.forEach(function (item) {
+          const text = item.getAttribute("data-search-text") || "";
+          item.style.display = text.includes(q) ? "" : "none";
+        });
       });
-    });
+    }
+
+    const clearBtn = document.getElementById("clear-county-select-filters");
+    const filterForm = document.getElementById("county-select-filter-form");
+    if (clearBtn && filterForm) {
+      clearBtn.addEventListener("click", function () {
+        Array.from(filterForm.elements).forEach(function (el) {
+          if (!el.name || el.disabled) return;
+          if (el.tagName === "SELECT") {
+            el.value = "";
+          } else if (el.type === "checkbox" || el.type === "radio") {
+            el.checked = false;
+          } else if (el.type !== "submit" && el.type !== "button") {
+            el.value = "";
+          }
+        });
+        filterForm.submit();
+      });
+    }
   })();
 </script>
 {% endblock %}
+

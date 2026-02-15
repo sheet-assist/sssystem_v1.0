@@ -211,19 +211,19 @@
             <span class="badge bg-warning text-dark">Pending</span>
           {% endif %}
         </p>
-        <p class="mb-1"><strong>ACK:</strong>
+        <p class="mb-1"><strong>AC:</strong>
           {% if object.ack_url %}
             {% if user.profile.is_admin %}
-              <a href="{{ object.ack_url }}" target="_blank" rel="noopener" class="text-success" title="Open ACK URL">
+              <a href="{{ object.ack_url }}" target="_blank" rel="noopener" class="text-success" title="Open AC URL">
                 <i class="bi bi-check-circle-fill fs-5"></i>
               </a>
             {% else %}
-              <span class="text-success" title="ACK URL available">
+              <span class="text-success" title="AC URL available">
                 <i class="bi bi-check-circle-fill fs-5"></i>
               </span>
             {% endif %}
           {% else %}
-            <span class="text-danger" title="ACK URL not available">
+            <span class="text-danger" title="AC URL not available">
               <i class="bi bi-x-circle-fill fs-5"></i>
             </span>
           {% endif %}
@@ -465,4 +465,5 @@
 </div>
 
 {% endblock %}
+
 

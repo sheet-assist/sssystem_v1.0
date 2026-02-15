@@ -112,6 +112,9 @@
         {% else %}
         <a href="{% url 'prospects:list_all' %}" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
         {% endif %}
+        <a class="btn btn-sm btn-outline-success ms-1" href="?{% for k,v in request.GET.items %}{% if k != 'page' and k != 'export' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}export=excel">
+          <i class="bi bi-file-earmark-excel"></i> Export Excel
+        </a>
       </div>
     </form>
   </div>
@@ -128,7 +131,7 @@
         <th>Auction Date</th>
         <th class="text-end d-none d-lg-table-cell">Surplus</th>
         <th>Qualification</th>
-        <th class="text-center d-none d-lg-table-cell">ACK</th>
+        <th class="text-center d-none d-lg-table-cell">AC</th>
         <th class="text-center d-none d-lg-table-cell">TDM</th>
         <th class="d-none d-xl-table-cell">Workflow</th>
         <th class="d-none d-xl-table-cell">Assigned To</th>
@@ -184,16 +187,16 @@
         <td class="text-center d-none d-lg-table-cell">
           {% if prospect.ack_url %}
             {% if user.profile.is_admin %}
-              <a href="{{ prospect.ack_url }}" target="_blank" rel="noopener" onclick="event.stopPropagation();" class="text-success" title="Open ACK URL">
+              <a href="{{ prospect.ack_url }}" target="_blank" rel="noopener" onclick="event.stopPropagation();" class="text-success" title="Open AC URL">
                 <i class="bi bi-check-circle-fill fs-5"></i>
               </a>
             {% else %}
-              <span class="text-success" title="ACK URL available">
+              <span class="text-success" title="AC URL available">
                 <i class="bi bi-check-circle-fill fs-5"></i>
               </span>
             {% endif %}
           {% else %}
-            <span class="text-danger" title="ACK URL not available">
+            <span class="text-danger" title="AC URL not available">
               <i class="bi bi-x-circle-fill fs-5"></i>
             </span>
           {% endif %}
@@ -315,3 +318,4 @@
 </script>
 {% endif %}
 {% endblock %}
+

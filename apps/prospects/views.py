@@ -1,6 +1,7 @@
 import calendar
 from datetime import date, timedelta
 from urllib.parse import urlencode
+from xml.sax.saxutils import escape
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -29,8 +30,94 @@ User = get_user_model()
 
 # --- Phase 5: Navigation Flow ---
 
-class TypeSelectView(ProspectsAccessMixin, TemplateView):
+def _xls_cell(value):
+    text = "" if value is None else str(value)
+    return f'<Cell><Data ss:Type="String">{escape(text)}</Data></Cell>'
+
+
+def export_prospects_excel_response(queryset, filename_prefix="prospects"):
+    headers = [
+        "Case #",
+        "Type",
+        "State",
+        "County",
+        "Parcel ID",
+        "Address",
+        "City",
+        "Zip",
+        "Auction Date",
+        "Surplus",
+        "Qualification",
+        "Status",
+        "AC URL",
+        "TDM URL",
+        "Assigned To",
+    ]
+
+    rows = []
+    for p in queryset.select_related("county", "county__state", "assigned_to"):
+        assigned_to = ""
+        if p.assigned_to:
+            assigned_to = p.assigned_to.get_full_name() or p.assigned_to.username
+        rows.append(
+            [
+                p.case_number,
+                p.get_prospect_type_display(),
+                p.county.state.abbreviation if p.county_id and p.county.state_id else "",
+                p.county.name if p.county_id else "",
+                p.parcel_id or "",
+                p.property_address or "",
+                p.city or "",
+                p.zip_code or "",
+                p.auction_date.isoformat() if p.auction_date else "",
+                f"{p.surplus_amount:.2f}" if p.surplus_amount is not None else "",
+                p.get_qualification_status_display(),
+                p.get_workflow_status_display(),
+                p.ack_url or "",
+                p.tdm_url or "",
+                assigned_to,
+            ]
+        )
+
+    header_xml = "<Row>" + "".join(_xls_cell(h) for h in headers) + "</Row>"
+    rows_xml = "".join("<Row>" + "".join(_xls_cell(v) for v in row) + "</Row>" for row in rows)
+
+    xml = (
+        '<?xml version="1.0"?>'
+        '<?mso-application progid="Excel.Sheet"?>'
+        '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" '
+        'xmlns:o="urn:schemas-microsoft-com:office:office" '
+        'xmlns:x="urn:schemas-microsoft-com:office:excel" '
+        'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" '
+        'xmlns:html="http://www.w3.org/TR/REC-html40">'
+        '<Worksheet ss:Name="Prospects"><Table>'
+        f"{header_xml}{rows_xml}"
+        "</Table></Worksheet></Workbook>"
+    )
+
+    response = HttpResponse(xml, content_type="application/vnd.ms-excel")
+    response["Content-Disposition"] = f'attachment; filename="{filename_prefix}_{timezone.localdate().isoformat()}.xls"'
+    return response
+
+
+class ProspectExcelExportMixin:
+    export_param = "export"
+    export_value = "excel"
+    export_filename_prefix = "prospects"
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.GET.get(self.export_param) == self.export_value:
+            filter_obj = context.get("filter")
+            if filter_obj is not None and getattr(filter_obj, "qs", None) is not None:
+                qs = filter_obj.qs
+            else:
+                qs = context.get("object_list", Prospect.objects.none())
+            return export_prospects_excel_response(qs, self.export_filename_prefix)
+        return super().render_to_response(context, **response_kwargs)
+
+class TypeSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, TemplateView):
     template_name = "prospects/type_select.html"
+    export_filename_prefix = "prospects_type"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -67,9 +154,8 @@ class TypeSelectView(ProspectsAccessMixin, TemplateView):
             prospect_qs = prospect_qs.filter(prospect_type=selected_type)
 
         filter_data = self.request.GET.copy()
-        if not filter_data.get("qualification_status"):
+        if "qualification_status" not in filter_data:
             filter_data["qualification_status"] = "qualified"
-
         prospect_filter = ProspectFilter(filter_data, queryset=prospect_qs)
         filtered_prospects = prospect_filter.qs.order_by("-auction_date", "-created_at")
         paginator = Paginator(filtered_prospects, 25)
@@ -89,9 +175,10 @@ class TypeSelectView(ProspectsAccessMixin, TemplateView):
         return ctx
 
 
-class StateSelectView(ProspectsAccessMixin, ListView):
+class StateSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, ListView):
     template_name = "prospects/state_select.html"
     context_object_name = "states"
+    export_filename_prefix = "prospects_state"
 
     def get_queryset(self):
         qs = State.objects.filter(is_active=True, counties__is_active=True).annotate(
@@ -134,7 +221,7 @@ class StateSelectView(ProspectsAccessMixin, ListView):
         ).select_related("county", "county__state", "assigned_to")
 
         filter_data = self.request.GET.copy()
-        if not filter_data.get("qualification_status"):
+        if "qualification_status" not in filter_data:
             filter_data["qualification_status"] = "qualified"
 
         prospect_filter = ProspectFilter(filter_data, queryset=prospect_qs)
@@ -155,9 +242,10 @@ class StateSelectView(ProspectsAccessMixin, ListView):
         return ctx
 
 
-class CountySelectView(ProspectsAccessMixin, ListView):
+class CountySelectView(ProspectsAccessMixin, ProspectExcelExportMixin, ListView):
     template_name = "prospects/county_select.html"
     context_object_name = "counties"
+    export_filename_prefix = "prospects_county"
 
     def get_queryset(self):
         qs = County.objects.filter(
@@ -203,7 +291,7 @@ class CountySelectView(ProspectsAccessMixin, ListView):
         ).select_related("county", "county__state", "assigned_to")
 
         filter_data = self.request.GET.copy()
-        if not filter_data.get("qualification_status"):
+        if "qualification_status" not in filter_data:
             filter_data["qualification_status"] = "qualified"
         if selected_state and not filter_data.get("state"):
             filter_data["state"] = str(selected_state.pk)
@@ -226,11 +314,12 @@ class CountySelectView(ProspectsAccessMixin, ListView):
         return ctx
 
 
-class ProspectListView(ProspectsAccessMixin, FilterView):
+class ProspectListView(ProspectsAccessMixin, ProspectExcelExportMixin, FilterView):
     model = Prospect
     template_name = "prospects/list.html"
     filterset_class = ProspectFilter
     paginate_by = 25
+    export_filename_prefix = "prospects_list"
 
     def get_queryset(self):
         qs = super().get_queryset().select_related("county", "county__state", "assigned_to")
@@ -479,11 +568,12 @@ class PendingListView(ProspectListView):
 
 # --- Phase 6: Assignment, Notes, Workflow ---
 
-class MyProspectsView(ProspectsAccessMixin, FilterView):
+class MyProspectsView(ProspectsAccessMixin, ProspectExcelExportMixin, FilterView):
     model = Prospect
     template_name = "prospects/list.html"
     filterset_class = ProspectFilter
     paginate_by = 25
+    export_filename_prefix = "prospects_my"
 
     def get_queryset(self):
         return Prospect.objects.filter(
@@ -783,3 +873,5 @@ class ProspectCaseCalendarView(ProspectsAccessMixin, TemplateView):
                 weeks.append(current_week)
                 current_week = []
         return weeks
+
+
