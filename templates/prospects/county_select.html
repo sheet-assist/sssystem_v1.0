@@ -91,6 +91,11 @@
         <div class="mt-1 text-muted small">
           <strong>Total Surplus:</strong> ${{ county.total_surplus|default:0|floatformat:2 }}
         </div>
+        {% if can_view_revenue %}
+        <div class="mt-1 text-muted small">
+          <strong>Total Revenue:</strong> ${{ county.total_revenue|default:0|floatformat:2 }}
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -141,7 +146,7 @@
 
 {% if has_active_filters %}
 <div class="row mb-3">
-  <div class="col-12 col-md-6">
+  <div class="col-12 {% if can_view_revenue %}col-md-4{% else %}col-md-6{% endif %}">
     <div class="card h-100">
       <div class="card-body py-2">
         <div class="small text-muted">Filtered Prospects</div>
@@ -149,7 +154,7 @@
       </div>
     </div>
   </div>
-  <div class="col-12 col-md-6 mt-2 mt-md-0">
+  <div class="col-12 {% if can_view_revenue %}col-md-4{% else %}col-md-6{% endif %} mt-2 mt-md-0">
     <div class="card h-100">
       <div class="card-body py-2">
         <div class="small text-muted">Filtered Total Surplus</div>
@@ -157,6 +162,16 @@
       </div>
     </div>
   </div>
+  {% if can_view_revenue %}
+  <div class="col-12 col-md-4 mt-2 mt-md-0">
+    <div class="card h-100">
+      <div class="card-body py-2">
+        <div class="small text-muted">Filtered Total Revenue ({{ ss_revenue_tier }}%)</div>
+        <div class="h5 mb-0">${{ filtered_revenue|floatformat:2 }}</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -171,6 +186,9 @@
         <th>Address</th>
         <th>Auction Date</th>
         <th class="text-end d-none d-lg-table-cell">Surplus</th>
+        {% if can_view_revenue %}
+        <th class="text-end d-none d-lg-table-cell">Revenue ({{ ss_revenue_tier }}%)</th>
+        {% endif %}
         <th>Qualification</th>
         <th class="text-center d-none d-lg-table-cell">AC</th>
         <th class="text-center d-none d-lg-table-cell">TDM</th>
@@ -213,6 +231,9 @@
         </td>
         <td>{{ prospect.auction_date|date:"m/d/Y"|default:"-" }}</td>
         <td class="text-end d-none d-lg-table-cell">{% if prospect.surplus_amount %}${{ prospect.surplus_amount|floatformat:2 }}{% else %}-{% endif %}</td>
+        {% if can_view_revenue %}
+        <td class="text-end d-none d-lg-table-cell">{% if prospect.ss_revenue_amount %}${{ prospect.ss_revenue_amount|floatformat:2 }}{% else %}-{% endif %}</td>
+        {% endif %}
         <td>
           {% if prospect.qualification_status == 'qualified' %}
             <span class="badge bg-success">Qualified</span>
@@ -280,7 +301,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="11" class="text-center text-muted py-4">No prospects found.</td>
+        <td colspan="{% if can_view_revenue %}12{% else %}11{% endif %}" class="text-center text-muted py-4">No prospects found.</td>
       </tr>
       {% endfor %}
     </tbody>

@@ -4,6 +4,7 @@ from apps.locations.models import County
 from apps.prospects.models import Prospect
 
 from .models import FilterCriteria
+from .models import SSRevenueSetting
 
 
 class FilterCriteriaForm(forms.ModelForm):
@@ -152,3 +153,12 @@ class FilterCriteriaForm(forms.ModelForm):
             raise forms.ValidationError("Auction Date: End must be on or after Start.")
         
         return cleaned
+
+
+class SSRevenueTierForm(forms.Form):
+    tier_percent = forms.ChoiceField(
+        choices=SSRevenueSetting.TIER_CHOICES,
+        widget=forms.RadioSelect,
+        initial="15",
+        label="SS Revenue Tier",
+    )

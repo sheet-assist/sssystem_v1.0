@@ -9,6 +9,15 @@
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="{% url 'prospects:type_select' %}">Prospects</a></li>
+    <li class="breadcrumb-item">
+      <a href="{% url 'prospects:state_select' object.prospect_type %}">{{ object.prospect_type }}</a>
+    </li>
+    <li class="breadcrumb-item">
+      <a href="{% url 'prospects:county_select' object.prospect_type object.county.state.abbreviation %}">{{ object.county.state.abbreviation }}</a>
+    </li>
+    <li class="breadcrumb-item">
+      <a href="{% url 'prospects:list' object.prospect_type object.county.state.abbreviation object.county.slug %}">{{ object.county.name }}</a>
+    </li>
     <li class="breadcrumb-item active" aria-current="page">{{ object.case_number }}</li>
   </ol>
 </nav>
@@ -34,6 +43,9 @@
 
 {# Action Buttons #}
 <div class="mb-4">
+  <button type="button" class="btn btn-outline-secondary btn-sm me-1" onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href='{% url 'prospects:type_select' %}'; }">
+    <i class="bi bi-arrow-left"></i> Back
+  </button>
   <a href="{% url 'prospects:assign' object.pk %}" class="btn btn-outline-primary btn-sm me-1">
     <i class="bi bi-person-plus"></i> Assign
   </a>

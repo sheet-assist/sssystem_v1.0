@@ -35,6 +35,15 @@
   <div class="col-md-4">
     <div class="card">
       <div class="card-body">
+        <h5 class="card-title">Finance</h5>
+        <p class="text-muted">SS Revenue Tier: <strong>{{ ss_revenue_tier }}%</strong></p>
+        <a href="{% url 'settings_app:finance' %}" class="btn btn-outline-secondary btn-sm">Manage Finance</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body">
         <h5 class="card-title">Users</h5>
         <p class="text-muted">Manage user accounts and roles</p>
         <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm">User List</a>

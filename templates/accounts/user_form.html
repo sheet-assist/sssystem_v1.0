@@ -62,6 +62,19 @@
 
         <div class="mb-3">
           <div class="form-check">
+            {{ form.can_manage_finance_settings }}
+            <label class="form-check-label" for="{{ form.can_manage_finance_settings.id_for_label }}">
+              {{ form.can_manage_finance_settings.label }}
+            </label>
+            {% if form.can_manage_finance_settings.errors %}
+            <div class="text-danger small">{{ form.can_manage_finance_settings.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <small class="form-text text-muted d-block mt-1">Allows access to Finance settings without full admin role.</small>
+        </div>
+
+        <div class="mb-3">
+          <div class="form-check">
             {{ form.is_active }}
             <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
               {{ form.is_active.label }}
