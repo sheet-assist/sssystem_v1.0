@@ -1,14 +1,138 @@
+from datetime import timedelta
+
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
+from django.db.models import DateField
+from django.db.models.functions import Cast, Coalesce, TruncDay, TruncMonth, TruncYear
+from django.utils import timezone
 from django.views.generic import TemplateView
 
 from apps.cases.models import Case, CaseActionLog
 from apps.prospects.models import Prospect, ProspectActionLog
 from apps.scraper.models import ScrapeJob
+from apps.settings_app.models import SSRevenueSetting
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard.html"
+
+    @staticmethod
+    def _build_conversion_kpi(case_qs, trunc_fn, date_format):
+        dated_cases = case_qs.annotate(
+            signed_date=Coalesce("contract_date", Cast("created_at", DateField()))
+        ).annotate(period=trunc_fn("signed_date"))
+
+        grouped = (
+            dated_cases.values("period", "assigned_to__username")
+            .annotate(
+                total_cases=Count("id"),
+                signed_deals=Count("id", filter=Q(status="closed_won")),
+            )
+            .order_by("period", "assigned_to__username")
+        )
+
+        labels = []
+        user_series = {}
+        details = {}
+
+        for row in grouped:
+            period = row["period"]
+            if period is None:
+                continue
+            label = period.strftime(date_format)
+            if label not in labels:
+                labels.append(label)
+            username = row["assigned_to__username"] or "Unassigned"
+            if username not in user_series:
+                user_series[username] = {}
+            if username not in details:
+                details[username] = {}
+            total_cases = row["total_cases"] or 0
+            signed_deals = row["signed_deals"] or 0
+            rate = round((signed_deals / total_cases * 100), 1) if total_cases else 0
+            user_series[username][label] = rate
+            details[username][label] = {
+                "assigned": total_cases,
+                "converted": signed_deals,
+                "conversion_rate": rate,
+            }
+
+        datasets = []
+        for username, series in sorted(user_series.items()):
+            datasets.append(
+                {
+                    "label": username,
+                    "data": [series.get(label, 0) for label in labels],
+                }
+            )
+
+        return {"labels": labels, "datasets": datasets, "details": details}
+
+    @staticmethod
+    def _build_prospect_conversion_kpi(prospect_qs, trunc_fn, date_format):
+        assigned_grouped = (
+            prospect_qs.filter(assigned_to__isnull=False, assigned_at__isnull=False)
+            .annotate(period=trunc_fn("assigned_at"))
+            .values("period", "assigned_to__username")
+            .annotate(assigned_count=Count("id"))
+            .order_by("period", "assigned_to__username")
+        )
+        converted_grouped = (
+            prospect_qs.filter(
+                assigned_to__isnull=False,
+                assigned_at__isnull=False,
+                workflow_status="converted",
+            )
+            .annotate(period=trunc_fn("assigned_at"))
+            .values("period", "assigned_to__username")
+            .annotate(converted_count=Count("id"))
+            .order_by("period", "assigned_to__username")
+        )
+
+        data_map = {}
+
+        for row in assigned_grouped:
+            period = row["period"]
+            username = row["assigned_to__username"]
+            if period is None or not username:
+                continue
+            label = period.strftime(date_format)
+            key = (label, username)
+            data_map.setdefault(key, {"assigned": 0, "converted": 0})
+            data_map[key]["assigned"] = row["assigned_count"] or 0
+
+        for row in converted_grouped:
+            period = row["period"]
+            username = row["assigned_to__username"]
+            if period is None or not username:
+                continue
+            label = period.strftime(date_format)
+            key = (label, username)
+            data_map.setdefault(key, {"assigned": 0, "converted": 0})
+            data_map[key]["converted"] = row["converted_count"] or 0
+
+        labels = sorted({label for (label, _username) in data_map.keys()})
+        users = sorted({username for (_label, username) in data_map.keys()})
+
+        details = {}
+        datasets = []
+        for username in users:
+            details[username] = {}
+            data_points = []
+            for label in labels:
+                row = data_map.get((label, username), {"assigned": 0, "converted": 0})
+                assigned = row["assigned"]
+                converted = row["converted"]
+                rate = round((converted / assigned) * 100, 1) if assigned else 0
+                details[username][label] = {
+                    "assigned": assigned,
+                    "converted": converted,
+                    "conversion_rate": rate,
+                }
+                data_points.append(rate)
+            datasets.append({"label": username, "data": data_points})
+
+        return {"labels": labels, "datasets": datasets, "details": details}
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -22,6 +146,62 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ctx["qualified_count"] = prospect_qs.filter(qualification_status="qualified").count()
         ctx["disqualified_count"] = prospect_qs.filter(qualification_status="disqualified").count()
         ctx["pending_count"] = prospect_qs.filter(qualification_status="pending").count()
+        qualified_surplus = (
+            prospect_qs.filter(qualification_status="qualified")
+            .aggregate(total=Sum("surplus_amount"))
+            .get("total")
+        ) or 0
+        ss_revenue_tier = SSRevenueSetting.get_solo().tier_percent
+        ctx["qualified_surplus_amount"] = qualified_surplus
+        ctx["total_revenue"] = (qualified_surplus * ss_revenue_tier) / 100
+        ctx["ss_revenue_tier"] = ss_revenue_tier
+        # Daily qualified trend (last 30 days)
+        today = timezone.localdate()
+        start_date = today - timedelta(days=29)
+        qualified_rows = (
+            prospect_qs.filter(
+                qualification_date__date__gte=start_date,
+                qualification_date__date__lte=today,
+            )
+            .annotate(day=TruncDay("qualification_date"))
+            .values("day")
+            .annotate(count=Count("id"))
+            .order_by("day")
+        )
+        disqualified_rows = (
+            prospect_qs.filter(
+                disqualification_date__date__gte=start_date,
+                disqualification_date__date__lte=today,
+            )
+            .annotate(day=TruncDay("disqualification_date"))
+            .values("day")
+            .annotate(count=Count("id"))
+            .order_by("day")
+        )
+        day_counts = {
+            row["day"].date().isoformat(): row["count"]
+            for row in qualified_rows
+            if row.get("day")
+        }
+        disqualified_day_counts = {
+            row["day"].date().isoformat(): row["count"]
+            for row in disqualified_rows
+            if row.get("day")
+        }
+        labels = []
+        qualified_counts = []
+        disqualified_counts = []
+        for offset in range(30):
+            day = start_date + timedelta(days=offset)
+            key = day.isoformat()
+            labels.append(key)
+            qualified_counts.append(day_counts.get(key, 0))
+            disqualified_counts.append(disqualified_day_counts.get(key, 0))
+        ctx["daily_qualified_chart"] = {
+            "labels": labels,
+            "qualified_counts": qualified_counts,
+            "disqualified_counts": disqualified_counts,
+        }
 
         # Pipeline by workflow_status — list of (label, count) for template
         pipeline_dict = {}
@@ -54,6 +234,22 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             round(converted / ctx["total_prospects"] * 100, 1)
             if ctx["total_prospects"] > 0 else 0
         )
+
+        # User performance KPI: case-to-signed-deal conversion by period
+        signed_case_qs = case_qs.exclude(assigned_to__isnull=True)
+        ctx["conversion_kpi"] = {
+            "daily": self._build_conversion_kpi(signed_case_qs, TruncDay, "%Y-%m-%d"),
+            "monthly": self._build_conversion_kpi(signed_case_qs, TruncMonth, "%Y-%m"),
+            "yearly": self._build_conversion_kpi(signed_case_qs, TruncYear, "%Y"),
+        }
+
+        # Prospect conversion KPI by assigned user:
+        # converted = assigned prospect with workflow_status="converted"
+        ctx["prospect_conversion_kpi"] = {
+            "daily": self._build_prospect_conversion_kpi(prospect_qs, TruncDay, "%Y-%m-%d"),
+            "monthly": self._build_prospect_conversion_kpi(prospect_qs, TruncMonth, "%Y-%m"),
+            "yearly": self._build_prospect_conversion_kpi(prospect_qs, TruncYear, "%Y"),
+        }
 
         # --- Scraper stats (admin only) ---
         if is_admin:

@@ -5,6 +5,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 
 from apps.locations.models import County, State
 from apps.prospects.models import (
@@ -114,6 +115,42 @@ class ProspectModelTest(ProspectTestMixin, TestCase):
         self.assertEqual(note.rule, rule)
         self.assertEqual(note.rule_name, "Auto Rule")
         self.assertEqual(note.decision, "qualified")
+
+    def test_qualification_date_set_when_status_changes_to_qualified(self):
+        p = Prospect.objects.create(
+            prospect_type="TD",
+            case_number="2024-QUAL-DATE",
+            county=self.county,
+            auction_date=date(2024, 8, 1),
+            qualification_status="pending",
+        )
+        self.assertIsNone(p.qualification_date)
+
+        before = timezone.now()
+        p.qualification_status = "qualified"
+        p.save(update_fields=["qualification_status"])
+        p.refresh_from_db()
+
+        self.assertIsNotNone(p.qualification_date)
+        self.assertGreaterEqual(p.qualification_date, before)
+
+    def test_disqualification_date_set_when_status_changes_to_disqualified(self):
+        p = Prospect.objects.create(
+            prospect_type="TD",
+            case_number="2024-DISQUAL-DATE",
+            county=self.county,
+            auction_date=date(2024, 8, 2),
+            qualification_status="pending",
+        )
+        self.assertIsNone(p.disqualification_date)
+
+        before = timezone.now()
+        p.qualification_status = "disqualified"
+        p.save(update_fields=["qualification_status"])
+        p.refresh_from_db()
+
+        self.assertIsNotNone(p.disqualification_date)
+        self.assertGreaterEqual(p.disqualification_date, before)
 
 
 class ProspectNoteTest(ProspectTestMixin, TestCase):
