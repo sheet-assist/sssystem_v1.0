@@ -125,6 +125,10 @@ class DashboardTest(TestCase):
         self.assertContains(resp, "Total Prospects")
         self.assertContains(resp, "Active Cases")
         self.assertContains(resp, "Conversion Rate")
+        self.assertContains(resp, "Qualified Surplus Amount")
+        self.assertContains(resp, "Total Revenue")
+        self.assertContains(resp, "Daily Qualified Count (Last 30 Days)")
+        self.assertContains(resp, "Prospect Conversion % (Assigned to Converted by User)")
 
     def test_dashboard_shows_correct_prospect_counts(self):
         Prospect.objects.create(

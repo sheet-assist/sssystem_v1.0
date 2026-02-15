@@ -29,7 +29,7 @@
           <th>Auction Date</th>
           <th class="text-end">Surplus</th>
           <th>Qualification</th>
-          <th class="text-center">ACK</th>
+          <th class="text-center">AC</th>
           <th class="text-center">TDM</th>
           <th>Workflow</th>
           <th>Assigned To</th>
@@ -84,16 +84,16 @@
           <td class="text-center">
             {% if prospect.ack_url %}
               {% if user.profile.is_admin %}
-                <a href="{{ prospect.ack_url }}" target="_blank" rel="noopener" class="text-success" title="Open ACK URL">
+                <a href="{{ prospect.ack_url }}" target="_blank" rel="noopener" class="text-success" title="Open AC URL">
                   <i class="bi bi-check-circle-fill fs-5"></i>
                 </a>
               {% else %}
-                <span class="text-success" title="ACK URL available">
+                <span class="text-success" title="AC URL available">
                   <i class="bi bi-check-circle-fill fs-5"></i>
                 </span>
               {% endif %}
             {% else %}
-              <span class="text-danger" title="ACK URL not available">
+              <span class="text-danger" title="AC URL not available">
                 <i class="bi bi-x-circle-fill fs-5"></i>
               </span>
             {% endif %}
@@ -192,3 +192,4 @@
 <p class="text-muted">Enter a search term above.</p>
 {% endif %}
 {% endblock %}
+

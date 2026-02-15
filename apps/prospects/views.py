@@ -1,11 +1,12 @@
 import calendar
 from datetime import date, timedelta
 from urllib.parse import urlencode
+from xml.sax.saxutils import escape
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
-from django.db.models import Count, Q, Min, Max, Sum
+from django.db.models import Count, Q, Min, Max, Sum, F, Value, ExpressionWrapper, DecimalField
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -19,6 +20,7 @@ import json
 
 from apps.accounts.mixins import AdminRequiredMixin, ProspectsAccessMixin
 from apps.locations.models import County, State
+from apps.settings_app.models import SSRevenueSetting
 
 from .filters import ProspectFilter
 from .forms import AssignProspectForm, ProspectNoteForm, ResearchForm, WorkflowTransitionForm
@@ -29,11 +31,116 @@ User = get_user_model()
 
 # --- Phase 5: Navigation Flow ---
 
-class TypeSelectView(ProspectsAccessMixin, TemplateView):
+def _xls_cell(value):
+    text = "" if value is None else str(value)
+    return f'<Cell><Data ss:Type="String">{escape(text)}</Data></Cell>'
+
+
+def export_prospects_excel_response(queryset, filename_prefix="prospects"):
+    headers = [
+        "Case #",
+        "Type",
+        "State",
+        "County",
+        "Parcel ID",
+        "Address",
+        "City",
+        "Zip",
+        "Auction Date",
+        "Surplus",
+        "Qualification",
+        "Status",
+        "AC URL",
+        "TDM URL",
+        "Assigned To",
+    ]
+
+    rows = []
+    for p in queryset.select_related("county", "county__state", "assigned_to"):
+        assigned_to = ""
+        if p.assigned_to:
+            assigned_to = p.assigned_to.get_full_name() or p.assigned_to.username
+        rows.append(
+            [
+                p.case_number,
+                p.get_prospect_type_display(),
+                p.county.state.abbreviation if p.county_id and p.county.state_id else "",
+                p.county.name if p.county_id else "",
+                p.parcel_id or "",
+                p.property_address or "",
+                p.city or "",
+                p.zip_code or "",
+                p.auction_date.isoformat() if p.auction_date else "",
+                f"{p.surplus_amount:.2f}" if p.surplus_amount is not None else "",
+                p.get_qualification_status_display(),
+                p.get_workflow_status_display(),
+                p.ack_url or "",
+                p.tdm_url or "",
+                assigned_to,
+            ]
+        )
+
+    header_xml = "<Row>" + "".join(_xls_cell(h) for h in headers) + "</Row>"
+    rows_xml = "".join("<Row>" + "".join(_xls_cell(v) for v in row) + "</Row>" for row in rows)
+
+    xml = (
+        '<?xml version="1.0"?>'
+        '<?mso-application progid="Excel.Sheet"?>'
+        '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" '
+        'xmlns:o="urn:schemas-microsoft-com:office:office" '
+        'xmlns:x="urn:schemas-microsoft-com:office:excel" '
+        'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" '
+        'xmlns:html="http://www.w3.org/TR/REC-html40">'
+        '<Worksheet ss:Name="Prospects"><Table>'
+        f"{header_xml}{rows_xml}"
+        "</Table></Worksheet></Workbook>"
+    )
+
+    response = HttpResponse(xml, content_type="application/vnd.ms-excel")
+    response["Content-Disposition"] = f'attachment; filename="{filename_prefix}_{timezone.localdate().isoformat()}.xls"'
+    return response
+
+
+class ProspectExcelExportMixin:
+    export_param = "export"
+    export_value = "excel"
+    export_filename_prefix = "prospects"
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.GET.get(self.export_param) == self.export_value:
+            filter_obj = context.get("filter")
+            if filter_obj is not None and getattr(filter_obj, "qs", None) is not None:
+                qs = filter_obj.qs
+            else:
+                qs = context.get("object_list", Prospect.objects.none())
+            return export_prospects_excel_response(qs, self.export_filename_prefix)
+        return super().render_to_response(context, **response_kwargs)
+
+
+def _can_view_revenue(user):
+    return hasattr(user, "profile") and (user.profile.is_admin or user.profile.can_manage_finance_settings)
+
+
+def _get_ss_revenue_tier():
+    return SSRevenueSetting.get_solo().tier_percent
+
+
+def _annotate_revenue(qs, tier_percent):
+    return qs.annotate(
+        ss_revenue_amount=ExpressionWrapper(
+            (F("surplus_amount") * Value(tier_percent)) / Value(100),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        )
+    )
+
+class TypeSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, TemplateView):
     template_name = "prospects/type_select.html"
+    export_filename_prefix = "prospects_type"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        can_view_revenue = _can_view_revenue(self.request.user)
+        ss_revenue_tier = _get_ss_revenue_tier()
         ctx["types"] = Prospect.PROSPECT_TYPES
         type_stats = {
             row["prospect_type"]: row
@@ -54,6 +161,7 @@ class TypeSelectView(ProspectsAccessMixin, TemplateView):
                 "first_auction": type_stats.get(code, {}).get("first_auction"),
                 "last_auction": type_stats.get(code, {}).get("last_auction"),
                 "total_surplus": type_stats.get(code, {}).get("total_surplus") or 0,
+                "total_revenue": ((type_stats.get(code, {}).get("total_surplus") or 0) * ss_revenue_tier / 100),
             }
             for code, label in Prospect.PROSPECT_TYPES
         ]
@@ -67,11 +175,16 @@ class TypeSelectView(ProspectsAccessMixin, TemplateView):
             prospect_qs = prospect_qs.filter(prospect_type=selected_type)
 
         filter_data = self.request.GET.copy()
-        if not filter_data.get("qualification_status"):
+        if "qualification_status" not in filter_data:
             filter_data["qualification_status"] = "qualified"
-
         prospect_filter = ProspectFilter(filter_data, queryset=prospect_qs)
-        filtered_prospects = prospect_filter.qs.order_by("-auction_date", "-created_at")
+        filtered_qs = prospect_filter.qs
+        if can_view_revenue:
+            filtered_qs = _annotate_revenue(filtered_qs, ss_revenue_tier)
+        filtered_prospects = filtered_qs.order_by(
+            F("auction_date").asc(nulls_last=True),
+            "created_at",
+        )
         paginator = Paginator(filtered_prospects, 25)
         page_obj = paginator.get_page(self.request.GET.get("page"))
         has_active_filters = any(k != "page" and bool(v) for k, v in self.request.GET.items())
@@ -86,12 +199,16 @@ class TypeSelectView(ProspectsAccessMixin, TemplateView):
         ctx["has_active_filters"] = has_active_filters
         ctx["filtered_total"] = prospect_filter.qs.count()
         ctx["filtered_surplus"] = filtered_surplus
+        ctx["filtered_revenue"] = (filtered_surplus * ss_revenue_tier / 100) if can_view_revenue else 0
+        ctx["can_view_revenue"] = can_view_revenue
+        ctx["ss_revenue_tier"] = ss_revenue_tier
         return ctx
 
 
-class StateSelectView(ProspectsAccessMixin, ListView):
+class StateSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, ListView):
     template_name = "prospects/state_select.html"
     context_object_name = "states"
+    export_filename_prefix = "prospects_state"
 
     def get_queryset(self):
         qs = State.objects.filter(is_active=True, counties__is_active=True).annotate(
@@ -126,19 +243,30 @@ class StateSelectView(ProspectsAccessMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        can_view_revenue = _can_view_revenue(self.request.user)
+        ss_revenue_tier = _get_ss_revenue_tier()
         ctx["prospect_type"] = self.kwargs["prospect_type"]
         ctx["type_display"] = dict(Prospect.PROSPECT_TYPES).get(self.kwargs["prospect_type"], "")
+        if can_view_revenue:
+            for state_obj in ctx["states"]:
+                state_obj.total_revenue = ((state_obj.total_surplus or 0) * ss_revenue_tier / 100)
 
         prospect_qs = Prospect.objects.filter(
             prospect_type=self.kwargs["prospect_type"]
         ).select_related("county", "county__state", "assigned_to")
 
         filter_data = self.request.GET.copy()
-        if not filter_data.get("qualification_status"):
+        if "qualification_status" not in filter_data:
             filter_data["qualification_status"] = "qualified"
 
         prospect_filter = ProspectFilter(filter_data, queryset=prospect_qs)
-        filtered_prospects = prospect_filter.qs.order_by("-auction_date", "-created_at")
+        filtered_qs = prospect_filter.qs
+        if can_view_revenue:
+            filtered_qs = _annotate_revenue(filtered_qs, ss_revenue_tier)
+        filtered_prospects = filtered_qs.order_by(
+            F("auction_date").asc(nulls_last=True),
+            "created_at",
+        )
         paginator = Paginator(filtered_prospects, 25)
         page_obj = paginator.get_page(self.request.GET.get("page"))
         has_active_filters = any(k != "page" and bool(v) for k, v in self.request.GET.items())
@@ -152,12 +280,16 @@ class StateSelectView(ProspectsAccessMixin, ListView):
         ctx["has_active_filters"] = has_active_filters
         ctx["filtered_total"] = prospect_filter.qs.count()
         ctx["filtered_surplus"] = filtered_surplus
+        ctx["filtered_revenue"] = (filtered_surplus * ss_revenue_tier / 100) if can_view_revenue else 0
+        ctx["can_view_revenue"] = can_view_revenue
+        ctx["ss_revenue_tier"] = ss_revenue_tier
         return ctx
 
 
-class CountySelectView(ProspectsAccessMixin, ListView):
+class CountySelectView(ProspectsAccessMixin, ProspectExcelExportMixin, ListView):
     template_name = "prospects/county_select.html"
     context_object_name = "counties"
+    export_filename_prefix = "prospects_county"
 
     def get_queryset(self):
         qs = County.objects.filter(
@@ -190,10 +322,15 @@ class CountySelectView(ProspectsAccessMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        can_view_revenue = _can_view_revenue(self.request.user)
+        ss_revenue_tier = _get_ss_revenue_tier()
         ctx["prospect_type"] = self.kwargs["prospect_type"]
         ctx["type_display"] = dict(Prospect.PROSPECT_TYPES).get(self.kwargs["prospect_type"], "")
         state_abbr = self.kwargs["state"].upper()
         ctx["state_abbr"] = state_abbr
+        if can_view_revenue:
+            for county_obj in ctx["counties"]:
+                county_obj.total_revenue = ((county_obj.total_surplus or 0) * ss_revenue_tier / 100)
 
         selected_state = State.objects.filter(abbreviation__iexact=self.kwargs["state"]).first()
 
@@ -203,13 +340,19 @@ class CountySelectView(ProspectsAccessMixin, ListView):
         ).select_related("county", "county__state", "assigned_to")
 
         filter_data = self.request.GET.copy()
-        if not filter_data.get("qualification_status"):
+        if "qualification_status" not in filter_data:
             filter_data["qualification_status"] = "qualified"
         if selected_state and not filter_data.get("state"):
             filter_data["state"] = str(selected_state.pk)
 
         prospect_filter = ProspectFilter(filter_data, queryset=prospect_qs)
-        filtered_prospects = prospect_filter.qs.order_by("-auction_date", "-created_at")
+        filtered_qs = prospect_filter.qs
+        if can_view_revenue:
+            filtered_qs = _annotate_revenue(filtered_qs, ss_revenue_tier)
+        filtered_prospects = filtered_qs.order_by(
+            F("auction_date").asc(nulls_last=True),
+            "created_at",
+        )
         paginator = Paginator(filtered_prospects, 25)
         page_obj = paginator.get_page(self.request.GET.get("page"))
         has_active_filters = any(k != "page" and bool(v) for k, v in self.request.GET.items())
@@ -223,17 +366,23 @@ class CountySelectView(ProspectsAccessMixin, ListView):
         ctx["has_active_filters"] = has_active_filters
         ctx["filtered_total"] = prospect_filter.qs.count()
         ctx["filtered_surplus"] = filtered_surplus
+        ctx["filtered_revenue"] = (filtered_surplus * ss_revenue_tier / 100) if can_view_revenue else 0
+        ctx["can_view_revenue"] = can_view_revenue
+        ctx["ss_revenue_tier"] = ss_revenue_tier
         return ctx
 
 
-class ProspectListView(ProspectsAccessMixin, FilterView):
+class ProspectListView(ProspectsAccessMixin, ProspectExcelExportMixin, FilterView):
     model = Prospect
     template_name = "prospects/list.html"
     filterset_class = ProspectFilter
     paginate_by = 25
+    export_filename_prefix = "prospects_list"
 
     def get_queryset(self):
         qs = super().get_queryset().select_related("county", "county__state", "assigned_to")
+        if _can_view_revenue(self.request.user):
+            qs = _annotate_revenue(qs, _get_ss_revenue_tier())
         ptype = self.kwargs.get("prospect_type")
         state = self.kwargs.get("state") or self.request.GET.get("state")
         county_slug = self.kwargs.get("county") or self.request.GET.get("county")
@@ -243,7 +392,7 @@ class ProspectListView(ProspectsAccessMixin, FilterView):
             qs = qs.filter(county__state__abbreviation__iexact=state)
         if county_slug:
             qs = qs.filter(county__slug=county_slug)
-        return qs
+        return qs.order_by(F("auction_date").asc(nulls_last=True), "created_at")
 
     def get_filterset_kwargs(self, filterset_class):
         """Inject a default qualification_status=qualified when no qualification filter is provided.
@@ -279,6 +428,8 @@ class ProspectListView(ProspectsAccessMixin, FilterView):
         ctx["type_display"] = dict(Prospect.PROSPECT_TYPES).get(self.kwargs.get("prospect_type", ""), "")
         ctx["state_abbr"] = self.kwargs.get("state", "")
         ctx["county_slug"] = self.kwargs.get("county", "")
+        ctx["can_view_revenue"] = _can_view_revenue(self.request.user)
+        ctx["ss_revenue_tier"] = _get_ss_revenue_tier()
         if self.kwargs.get("county"):
             ctx["county_obj"] = County.objects.filter(slug=self.kwargs["county"]).first()
 
@@ -479,20 +630,28 @@ class PendingListView(ProspectListView):
 
 # --- Phase 6: Assignment, Notes, Workflow ---
 
-class MyProspectsView(ProspectsAccessMixin, FilterView):
+class MyProspectsView(ProspectsAccessMixin, ProspectExcelExportMixin, FilterView):
     model = Prospect
     template_name = "prospects/list.html"
     filterset_class = ProspectFilter
     paginate_by = 25
+    export_filename_prefix = "prospects_my"
 
     def get_queryset(self):
-        return Prospect.objects.filter(
+        qs = Prospect.objects.filter(
             assigned_to=self.request.user
         ).select_related("county", "county__state", "assigned_to")
+        if _can_view_revenue(self.request.user):
+            qs = _annotate_revenue(qs, _get_ss_revenue_tier())
+        return qs.order_by(
+            F("auction_date").asc(nulls_last=True), "created_at"
+        )
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["page_title"] = "My Prospects"
+        ctx["can_view_revenue"] = _can_view_revenue(self.request.user)
+        ctx["ss_revenue_tier"] = _get_ss_revenue_tier()
         return ctx
 
 
@@ -783,3 +942,5 @@ class ProspectCaseCalendarView(ProspectsAccessMixin, TemplateView):
                 weeks.append(current_week)
                 current_week = []
         return weeks
+
+

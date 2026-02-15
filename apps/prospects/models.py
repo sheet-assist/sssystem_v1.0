@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -74,6 +75,8 @@ class Prospect(models.Model):
 
     # Status tracking
     qualification_status = models.CharField(max_length=32, choices=QUALIFICATION_STATUS, default="pending")
+    qualification_date = models.DateTimeField(null=True, blank=True)
+    disqualification_date = models.DateTimeField(null=True, blank=True)
     workflow_status = models.CharField(max_length=32, choices=WORKFLOW_STATUS, default="new")
 
     # Parties
@@ -111,6 +114,40 @@ class Prospect(models.Model):
     class Meta:
         unique_together = [("county", "case_number", "auction_date")]
         ordering = ["-auction_date", "-created_at"]
+
+    def save(self, *args, **kwargs):
+        previous_status = None
+        if self.pk:
+            previous_status = (
+                type(self).objects.filter(pk=self.pk)
+                .values_list("qualification_status", flat=True)
+                .first()
+            )
+
+        became_qualified = (
+            self.qualification_status == "qualified"
+            and (previous_status != "qualified")
+        )
+        became_disqualified = (
+            self.qualification_status == "disqualified"
+            and (previous_status != "disqualified")
+        )
+        if became_qualified:
+            self.qualification_date = timezone.now()
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                fields = set(update_fields)
+                fields.add("qualification_date")
+                kwargs["update_fields"] = list(fields)
+        if became_disqualified:
+            self.disqualification_date = timezone.now()
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                fields = set(update_fields)
+                fields.add("disqualification_date")
+                kwargs["update_fields"] = list(fields)
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.prospect_type} {self.case_number} ({self.county})"

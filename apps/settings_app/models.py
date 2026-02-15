@@ -1,4 +1,7 @@
 from django.db import models
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class FilterCriteria(models.Model):
@@ -164,3 +167,45 @@ class FilterCriteria(models.Model):
             sentence = f"{condition_text} {location_text} will be marked as qualified."
             return sentence[:1].upper() + sentence[1:]
         return f"Prospects {location_text} will be marked as qualified."
+
+
+class SSRevenueSetting(models.Model):
+    TIER_CHOICES = [
+        (10, "10%"),
+        (13, "13%"),
+        (15, "15%"),
+        (18, "18%"),
+        (25, "25%"),
+        (30, "30%"),
+    ]
+
+    tier_percent = models.PositiveSmallIntegerField(choices=TIER_CHOICES, default=15)
+    ARS_TIER_CHOICES = [
+        (1, "1%"),
+        (3, "3%"),
+        (5, "5%"),
+        (7, "7%"),
+        (8, "8%"),
+        (9, "9%"),
+        (10, "10%"),
+    ]
+    ars_tier_percent = models.PositiveSmallIntegerField(choices=ARS_TIER_CHOICES, default=5)
+    updated_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="updated_ss_revenue_settings"
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "SS Revenue Setting"
+        verbose_name_plural = "SS Revenue Settings"
+
+    def __str__(self):
+        return f"SS Revenue Tier: {self.tier_percent}% | ARS Tier: {self.ars_tier_percent}%"
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(
+            pk=1,
+            defaults={"tier_percent": 15, "ars_tier_percent": 5},
+        )
+        return obj

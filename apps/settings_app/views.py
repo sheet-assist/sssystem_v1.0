@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views import View
@@ -6,9 +7,17 @@ from django.views.generic import CreateView, DeleteView, ListView, TemplateView,
 
 from apps.accounts.mixins import AdminRequiredMixin
 
-from .forms import FilterCriteriaForm
-from .models import FilterCriteria
+from .forms import FilterCriteriaForm, SSRevenueTierForm
+from .models import FilterCriteria, SSRevenueSetting
 from .services import apply_filter_rule
+
+
+class FinanceSettingsAccessMixin(LoginRequiredMixin, UserPassesTestMixin):
+    def test_func(self):
+        user = self.request.user
+        return hasattr(user, "profile") and (
+            user.profile.is_admin or user.profile.can_manage_finance_settings
+        )
 
 
 class SettingsHomeView(AdminRequiredMixin, TemplateView):
@@ -17,6 +26,9 @@ class SettingsHomeView(AdminRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["criteria_count"] = FilterCriteria.objects.filter(is_active=True).count()
+        setting = SSRevenueSetting.get_solo()
+        ctx["ss_revenue_tier"] = setting.tier_percent
+        ctx["ars_tier_percent"] = setting.ars_tier_percent
         return ctx
 
 
@@ -83,3 +95,49 @@ class CriteriaApplyView(AdminRequiredMixin, View):
             ),
         )
         return redirect("settings_app:criteria_edit", pk=rule.pk)
+
+
+class FinanceSettingsView(FinanceSettingsAccessMixin, TemplateView):
+    template_name = "settings_app/finance.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        setting = SSRevenueSetting.get_solo()
+        ctx["current_tier"] = setting.tier_percent
+        ctx["current_ars_tier"] = setting.ars_tier_percent
+        ctx["form"] = SSRevenueTierForm(
+            initial={
+                "tier_percent": str(setting.tier_percent),
+                "ars_tier_percent": str(setting.ars_tier_percent),
+            }
+        )
+        ctx["tier_choices"] = SSRevenueSetting.TIER_CHOICES
+        ctx["ars_tier_choices"] = SSRevenueSetting.ARS_TIER_CHOICES
+        ctx["selected_tier"] = str(setting.tier_percent)
+        ctx["selected_ars_tier"] = str(setting.ars_tier_percent)
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        form = SSRevenueTierForm(request.POST)
+        if not form.is_valid():
+            ctx = self.get_context_data(**kwargs)
+            ctx["form"] = form
+            ctx["tier_choices"] = SSRevenueSetting.TIER_CHOICES
+            ctx["ars_tier_choices"] = SSRevenueSetting.ARS_TIER_CHOICES
+            ctx["selected_tier"] = request.POST.get("tier_percent", "15")
+            ctx["selected_ars_tier"] = request.POST.get("ars_tier_percent", "5")
+            return self.render_to_response(ctx)
+
+        setting = SSRevenueSetting.get_solo()
+        setting.tier_percent = int(form.cleaned_data["tier_percent"])
+        setting.ars_tier_percent = int(form.cleaned_data["ars_tier_percent"])
+        setting.updated_by = request.user
+        setting.save(update_fields=["tier_percent", "ars_tier_percent", "updated_by", "updated_at"])
+        messages.success(
+            request,
+            (
+                f"SS Revenue Tier updated to {setting.tier_percent}% "
+                f"and ARS Tier updated to {setting.ars_tier_percent}%."
+            ),
+        )
+        return redirect("settings_app:finance")

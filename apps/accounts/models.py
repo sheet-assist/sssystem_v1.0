@@ -20,6 +20,7 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     role = models.CharField(max_length=32, choices=ROLE_CHOICES, default=ROLE_PROSPECTS_ONLY)
     phone = models.CharField(max_length=32, blank=True, default="")
+    can_manage_finance_settings = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

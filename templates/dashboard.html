@@ -6,12 +6,12 @@
 <h2 class="mb-4">Dashboard</h2>
 
 {# --- Top Stats Row --- #}
-<div class="row g-3 mb-4">
-  <div class="col-md-3">
+<div class="row row-cols-1 row-cols-sm-2 row-cols-xl-5 g-3 mb-4">
+  <div class="col">
     <div class="card text-center h-100">
       <div class="card-body">
         <h6 class="card-subtitle text-muted mb-2">Total Prospects</h6>
-        <p class="display-6 mb-0">{{ total_prospects }}</p>
+        <p class="fs-3 fw-semibold mb-0">{{ total_prospects }}</p>
       </div>
       <div class="card-footer bg-transparent border-0 pt-0">
         <small>
@@ -22,37 +22,94 @@
       </div>
     </div>
   </div>
-  <div class="col-md-3">
+  <div class="col">
     <div class="card text-center h-100">
       <div class="card-body">
         <h6 class="card-subtitle text-muted mb-2">Active Cases</h6>
-        <p class="display-6 mb-0">{{ active_cases }}</p>
+        <p class="fs-3 fw-semibold mb-0">{{ active_cases }}</p>
       </div>
       <div class="card-footer bg-transparent border-0 pt-0">
         <small>{{ total_cases }} total &middot; <span class="text-success">{{ closed_won }} won</span> &middot; <span class="text-danger">{{ closed_lost }} lost</span></small>
       </div>
     </div>
   </div>
-  <div class="col-md-3">
+  <div class="col">
     <div class="card text-center h-100">
       <div class="card-body">
         <h6 class="card-subtitle text-muted mb-2">Conversion Rate</h6>
-        <p class="display-6 mb-0">{{ conversion_rate }}%</p>
+        <p class="fs-3 fw-semibold mb-0">{{ conversion_rate }}%</p>
       </div>
       <div class="card-footer bg-transparent border-0 pt-0">
         <small>{{ converted_count }} of {{ total_prospects }} prospects converted</small>
       </div>
     </div>
   </div>
-  <div class="col-md-3">
+  <div class="col">
     <div class="card text-center h-100">
       <div class="card-body">
         <h6 class="card-subtitle text-muted mb-2">Touched / Untouched</h6>
-        <p class="display-6 mb-0">{{ touched_count }} / {{ untouched_count }}</p>
+        <p class="fs-3 fw-semibold mb-0">{{ touched_count }} / {{ untouched_count }}</p>
       </div>
       <div class="card-footer bg-transparent border-0 pt-0">
         <small>{{ untouched_count }} prospects still at "New"</small>
       </div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <h6 class="card-subtitle text-muted mb-2">Total Revenue  ({{ ss_revenue_tier }}%)</h6>
+        <p class="fs-4 fw-semibold mb-0">${{ total_revenue |floatformat:2 }}</p>
+      </div>
+      <div class="card-footer bg-transparent border-0 pt-0">
+        <small>Qualified Surplus Amount : <span class="text-success">${{ qualified_surplus_amount|floatformat:2 }}</span></small>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# --- Daily Qualified Trend --- #}
+<div class="card mb-4">
+  <div class="card-header">
+    <strong>Daily Qualified Count (Last 30 Days)</strong>
+  </div>
+  <div class="card-body py-2">
+    <div class="position-relative" style="height: 180px;">
+      <canvas id="dailyQualifiedChart"></canvas>
+    </div>
+  </div>
+</div>
+
+{# --- Prospect Conversion Chart --- #}
+<div class="card mb-4">
+  <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <strong>Prospect Conversion % (Assigned to Converted by User)</strong>
+    <div class="btn-group btn-group-sm" role="group" aria-label="Prospect Conversion Period">
+      <button type="button" class="btn btn-outline-success active" data-kpi-period-prospect="daily">Daily</button>
+      <button type="button" class="btn btn-outline-success" data-kpi-period-prospect="monthly">Monthly</button>
+      <button type="button" class="btn btn-outline-success" data-kpi-period-prospect="yearly">Yearly</button>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="position-relative" style="height: 320px;">
+      <canvas id="prospectConversionChart"></canvas>
+    </div>
+    <small class="text-muted d-block mt-2">
+      Conversion % = converted prospects / assigned prospects in period, grouped by user.
+    </small>
+    <div class="table-responsive mt-3">
+      <table class="table table-sm table-striped mb-0" id="prospectConversionTable">
+        <thead>
+          <tr>
+            <th>Period</th>
+            <th>User</th>
+            <th class="text-end">Assigned</th>
+            <th class="text-end">Converted</th>
+            <th class="text-end">Conversion %</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -175,4 +232,274 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{{ daily_qualified_chart|json_script:"daily-qualified-chart-data" }}
+{{ prospect_conversion_kpi|json_script:"prospect-conversion-kpi-data" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  (function() {
+    if (typeof Chart === "undefined") return;
+
+    const palette = [
+      "#0d6efd", "#198754", "#dc3545", "#fd7e14", "#6f42c1", "#20c997", "#6610f2", "#0dcaf0"
+    ];
+
+    const withColors = (datasets) => datasets.map((dataset, index) => ({
+      ...dataset,
+      borderColor: dataset.borderColor || palette[index % palette.length],
+      backgroundColor: dataset.backgroundColor || palette[index % palette.length],
+      tension: dataset.tension ?? 0.25,
+      fill: dataset.fill ?? false,
+      pointRadius: dataset.pointRadius ?? 3
+    }));
+
+    const dailyPayloadEl = document.getElementById("daily-qualified-chart-data");
+    const dailyChartEl = document.getElementById("dailyQualifiedChart");
+    if (dailyPayloadEl && dailyChartEl) {
+      const dailyData = JSON.parse(dailyPayloadEl.textContent || "{}");
+      if (window.dailyQualifiedChart && typeof window.dailyQualifiedChart.destroy === "function") {
+        window.dailyQualifiedChart.destroy();
+      }
+      window.dailyQualifiedChart = new Chart(dailyChartEl, {
+        type: "bar",
+        data: {
+          labels: dailyData.labels || [],
+          datasets: [{
+            label: "Qualified Count",
+            data: dailyData.qualified_counts || [],
+            backgroundColor: "rgba(25, 135, 84, 0.75)",
+            borderColor: "#198754",
+            borderWidth: 1,
+            maxBarThickness: 14,
+            barPercentage: 0.5,
+            categoryPercentage: 0.7,
+          }, {
+            label: "Disqualified Count",
+            data: dailyData.disqualified_counts || [],
+            backgroundColor: "rgba(220, 53, 69, 0.75)",
+            borderColor: "#dc3545",
+            borderWidth: 1,
+            maxBarThickness: 14,
+            barPercentage: 0.5,
+            categoryPercentage: 0.7,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0 },
+              title: { display: true, text: "Qualified Count" },
+            },
+            x: {
+              title: { display: true, text: "Date" },
+            },
+          },
+        },
+      });
+    }
+
+    const renderTable = (tableBody, periodData, mode) => {
+      if (!tableBody) return;
+      const labels = periodData.labels || [];
+      const datasets = periodData.datasets || [];
+      let rowsHtml = "";
+
+      labels.forEach((label, labelIndex) => {
+        datasets.forEach((dataset) => {
+          const value = Number(dataset.data?.[labelIndex] ?? 0);
+          if (mode === "case_rate" || mode === "prospect_rate") {
+            const details = (periodData.details || {})[dataset.label] || {};
+            const detailRow = details[label] || { assigned: 0, converted: 0, conversion_rate: value };
+            rowsHtml += `
+              <tr>
+                <td>${label}</td>
+                <td>${dataset.label}</td>
+                <td class="text-end">${Math.round(detailRow.assigned || 0)}</td>
+                <td class="text-end">${Math.round(detailRow.converted || 0)}</td>
+                <td class="text-end">${Number(detailRow.conversion_rate || value).toFixed(1)}%</td>
+              </tr>
+            `;
+          } else {
+            const renderedValue = mode === "percent" ? `${value.toFixed(1)}%` : `${Math.round(value)}`;
+            rowsHtml += `
+              <tr>
+                <td>${label}</td>
+                <td>${dataset.label}</td>
+                <td class="text-end">${renderedValue}</td>
+              </tr>
+            `;
+          }
+        });
+      });
+
+      if (!rowsHtml) {
+        const colspan = (mode === "case_rate" || mode === "prospect_rate") ? 5 : 3;
+        rowsHtml = `<tr><td colspan="${colspan}" class="text-center text-muted py-2">No KPI data available for this period.</td></tr>`;
+      }
+      tableBody.innerHTML = rowsHtml;
+    };
+
+    const toProspectMixedData = (periodData) => {
+      const details = periodData.details || {};
+      const users = Object.keys(details).sort();
+      const assigned = [];
+      const converted = [];
+      const rates = [];
+
+      users.forEach((user) => {
+        const byPeriod = details[user] || {};
+        let assignedTotal = 0;
+        let convertedTotal = 0;
+        Object.keys(byPeriod).forEach((periodLabel) => {
+          const row = byPeriod[periodLabel] || {};
+          assignedTotal += Number(row.assigned || 0);
+          convertedTotal += Number(row.converted || 0);
+        });
+        assigned.push(assignedTotal);
+        converted.push(convertedTotal);
+        rates.push(assignedTotal ? Number(((convertedTotal / assignedTotal) * 100).toFixed(1)) : 0);
+      });
+
+      return {
+        labels: users,
+        datasets: [{
+          label: "Assigned",
+          data: assigned,
+          backgroundColor: "rgba(13, 110, 253, 1)",
+          borderColor: "#0d6efd",
+          borderWidth: 2,
+          barThickness: 15,
+          barPercentage: 1.0,
+          categoryPercentage: 0.5,
+          inflateAmount: 0,
+          yAxisID: "y",
+        }, {
+          label: "Converted",
+          data: converted,
+          backgroundColor: "rgba(25, 135, 84, 1)",
+          borderColor: "#198754",
+          borderWidth: 2,
+          barThickness: 15,
+          barPercentage: 1.0,
+          categoryPercentage: 0.5,
+          inflateAmount: 0,
+          yAxisID: "y",
+        }, {
+          type: "line",
+          label: "Conversion %",
+          data: rates,
+          borderColor: "#dc3545",
+          backgroundColor: "#dc3545",
+          pointRadius: 2,
+          tension: 0.25,
+          yAxisID: "y1",
+          maxBarThickness: 18,
+        }],
+      };
+    };
+
+    const initKpiCard = (config) => {
+      const payloadEl = document.getElementById(config.payloadId);
+      const chartEl = document.getElementById(config.chartId);
+      const tableBody = document.querySelector(`#${config.tableId} tbody`);
+      if (!payloadEl || !chartEl) return;
+
+      const data = JSON.parse(payloadEl.textContent || "{}");
+      const initialPeriod = "daily";
+      const initialPeriodData = data[initialPeriod] || { labels: [], datasets: [] };
+      const initialChartData = config.transformChartData ? config.transformChartData(initialPeriodData) : initialPeriodData;
+
+      if (window[config.chartHandle] && typeof window[config.chartHandle].destroy === "function") {
+        window[config.chartHandle].destroy();
+      }
+
+      const chart = new Chart(chartEl, {
+        type: config.chartType || "line",
+        data: {
+          labels: initialChartData.labels || [],
+          datasets: withColors(initialChartData.datasets || []),
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: config.scales || { y: config.yScale },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: (context) => (
+                  config.tooltipLabel
+                    ? config.tooltipLabel(context)
+                    : `${context.dataset.label}: ${config.tooltipFormatter(context.parsed.y)}`
+                )
+              }
+            }
+          }
+        }
+      });
+      window[config.chartHandle] = chart;
+      renderTable(tableBody, initialPeriodData, config.tableMode);
+
+      const buttons = document.querySelectorAll(config.buttonSelector);
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const period = button.dataset[config.buttonDataset] || "daily";
+          const periodData = data[period] || { labels: [], datasets: [] };
+          const chartData = config.transformChartData ? config.transformChartData(periodData) : periodData;
+
+          buttons.forEach((btn) => btn.classList.remove("active"));
+          button.classList.add("active");
+
+          chart.data.labels = chartData.labels || [];
+          chart.data.datasets = withColors(chartData.datasets || []);
+          chart.update();
+          renderTable(tableBody, periodData, config.tableMode);
+        });
+      });
+    };
+
+    initKpiCard({
+      payloadId: "prospect-conversion-kpi-data",
+      chartId: "prospectConversionChart",
+      tableId: "prospectConversionTable",
+      chartHandle: "prospectConversionChart",
+      chartType: "bar",
+      transformChartData: toProspectMixedData,
+      buttonSelector: "[data-kpi-period-prospect]",
+      buttonDataset: "kpiPeriodProspect",
+      tableMode: "prospect_rate",
+      yScale: {
+        beginAtZero: true,
+        ticks: { precision: 0 },
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: "Count" },
+          ticks: { precision: 0 },
+        },
+        y1: {
+          beginAtZero: true,
+          max: 100,
+          position: "right",
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: "Conversion %" },
+          ticks: { callback: (value) => `${value}%` },
+        },
+      },
+      tooltipLabel: (context) => {
+        if (context.dataset.yAxisID === "y1") {
+          return `${context.dataset.label}: ${context.parsed.y}%`;
+        }
+        return `${context.dataset.label}: ${Math.round(context.parsed.y)}`;
+      },
+      tooltipFormatter: (value) => `${value}`
+    });
+  })();
+</script>
 {% endblock %}

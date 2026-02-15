@@ -45,7 +45,7 @@ class UserProfileForm(forms.ModelForm):
     
     class Meta:
         model = UserProfile
-        fields = ['role', 'phone']
+        fields = ['role', 'phone', 'can_manage_finance_settings']
         widgets = {
             'role': forms.Select(attrs={
                 "class": "form-select",
@@ -54,10 +54,14 @@ class UserProfileForm(forms.ModelForm):
                 "class": "form-control",
                 "placeholder": "Phone",
             }),
+            'can_manage_finance_settings': forms.CheckboxInput(attrs={
+                "class": "form-check-input",
+            }),
         }
         labels = {
             'role': 'Role',
             'phone': 'Phone',
+            'can_manage_finance_settings': 'Can Manage Finance Settings',
         }
     
     def __init__(self, *args, **kwargs):
