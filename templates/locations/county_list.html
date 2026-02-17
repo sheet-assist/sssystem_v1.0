@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}County Management{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>County Management</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'locations:county_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add County
+            </a>
+        </div>
+    </div>
+
+    <!-- Search Form -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="form-inline">
+                <div class="input-group w-100">
+                    <input type="text" name="search" class="form-control" placeholder="Search counties by name or state..." 
+                           value="{{ request.GET.search }}">
+                    <button class="btn btn-outline-secondary" type="submit">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                    {% if request.GET.search %}
+                    <a href="{% url 'locations:county_list' %}" class="btn btn-outline-secondary">
+                        Clear
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Counties Table -->
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>County</th>
+                    <th>State</th>
+                    <th>FIPS Code</th>
+                    <th>Platform</th>
+                    <th>Status</th>
+                    <th>Last Scraped</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for county in counties %}
+                <tr>
+                    <td>
+                        <strong>{{ county.name }}</strong>
+                    </td>
+                    <td>{{ county.state.abbreviation }}</td>
+                    <td>{{ county.fips_code|default:"—" }}</td>
+                    <td>
+                        <span class="badge bg-info">{{ county.get_platform_display }}</span>
+                    </td>
+                    <td>
+                        {% if county.is_active %}
+                        <span class="badge bg-success">Active</span>
+                        {% else %}
+                        <span class="badge bg-danger">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if county.last_scraped %}
+                        {{ county.last_scraped|date:"M d, Y H:i" }}
+                        {% else %}
+                        Never
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="btn-group" role="group">
+                            <a href="{% url 'locations:county_config' county.pk %}" class="btn btn-sm btn-primary" title="Configure">
+                                <i class="fas fa-cog"></i> Configure
+                            </a>
+                            <a href="{% url 'locations:county_delete' county.pk %}" class="btn btn-sm btn-danger" title="Delete">
+                                <i class="fas fa-trash"></i> Delete
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted">
+                        No counties found. <a href="{% url 'locations:county_create' %}">Create one now</a>.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1">First</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+            </li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+            <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+            </li>
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

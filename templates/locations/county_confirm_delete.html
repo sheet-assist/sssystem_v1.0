@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}Delete County - Confirmation{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> Delete County
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <strong>Warning:</strong> This action cannot be undone!
+                    </div>
+
+                    <p class="mb-3">
+                        Are you sure you want to delete the county:
+                    </p>
+
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <p class="mb-1">
+                                <strong>County:</strong> {{ object.name }}
+                            </p>
+                            <p class="mb-1">
+                                <strong>State:</strong> {{ object.state.name }} ({{ object.state.abbreviation }})
+                            </p>
+                            <p class="mb-0">
+                                <strong>Status:</strong> 
+                                {% if object.is_active %}
+                                <span class="badge bg-success">Active</span>
+                                {% else %}
+                                <span class="badge bg-danger">Inactive</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+
+                    <p class="text-muted">
+                        <i class="fas fa-info-circle"></i>
+                        This will remove all associated data for this county.
+                    </p>
+
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-lg">
+                            <i class="fas fa-trash"></i> Yes, Delete County
+                        </button>
+                        <a href="{% url 'locations:county_list' %}" class="btn btn-secondary btn-lg">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

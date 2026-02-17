@@ -149,6 +149,28 @@ class Prospect(models.Model):
 
         super().save(*args, **kwargs)
 
+    @property
+    def effective_ac_url(self):
+        """Get AC URL, fallback to county's auction calendar URL if not set"""
+        if self.ack_url:
+            return self.ack_url
+        if self.county and self.county.auction_calendar_url:
+            return self.county.auction_calendar_url
+        return None
+
+    @property
+    def effective_tdm_url(self):
+        """Get TDM URL, fallback to county's RealTDM URL if not set. Only for TD and TL types."""
+        # TDM fallback only applies to Tax Deed and Tax Lien
+        if self.prospect_type not in ('TD', 'TL'):
+            return self.tdm_url if self.tdm_url else None
+        
+        if self.tdm_url:
+            return self.tdm_url
+        if self.county and self.county.realtdm_url:
+            return self.county.realtdm_url
+        return None
+
     def __str__(self):
         return f"{self.prospect_type} {self.case_number} ({self.county})"
 

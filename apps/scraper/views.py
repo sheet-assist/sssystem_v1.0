@@ -274,13 +274,40 @@ class CountiesAjaxAPIView(AdminRequiredMixin, View):
     
     def get(self, request, state_code):
         """
-        GET /api/v2/counties/<state_code>/
-        Returns: { "counties": [{"id": 1, "name": "County Name"}, ...] }
+        GET /api/v2/counties/<state_code>/?job_type=<type>
+        Returns: { "counties": [{"id": 1, "name": "County Name", "url": "https://..."}, ...] }
         """
+        from .models import CountyScrapeURL
+        
         try:
             counties = CountyQueryService.get_counties_by_state(state_code)
+            job_type = request.GET.get('job_type', '').upper()
             
-            # counties is already a list of dicts from values('id', 'name')
+            # If job_type is provided, fetch active URLs for each county
+            if job_type:
+                counties_with_urls = []
+                for county in counties:
+                    county_dict = dict(county)  # Convert to dict if it's a dict-like object
+                    county_id = county_dict.get('id')
+                    county_name = county_dict.get('name')
+                    
+                    # Try to get active URL
+                    try:
+                        url_obj = CountyScrapeURL.objects.get(
+                            county_id=county_id,
+                            url_type=job_type,
+                            is_active=True
+                        )
+                        county_dict['url'] = url_obj.base_url
+                        county_dict['display_name'] = f"{county_name} - {url_obj.base_url}" if url_obj.base_url else county_name
+                    except CountyScrapeURL.DoesNotExist:
+                        county_dict['url'] = None
+                        county_dict['display_name'] = county_name
+                    
+                    counties_with_urls.append(county_dict)
+                
+                counties = counties_with_urls
+            
             return JsonResponse({
                 'success': True,
                 'state': state_code,

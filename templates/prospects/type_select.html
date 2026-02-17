@@ -251,9 +251,9 @@
           {% endif %}
         </td>
         <td class="text-center d-none d-lg-table-cell">
-          {% if prospect.ack_url %}
+          {% if prospect.effective_ac_url %}
             {% if user.profile.is_admin %}
-              <a href="{{ prospect.ack_url }}" target="_blank" rel="noopener" class="text-success" title="Open AC URL">
+              <a href="{{ prospect.effective_ac_url }}" target="_blank" rel="noopener" class="text-success" title="Open AC URL">
                 <i class="bi bi-check-circle-fill fs-5"></i>
               </a>
             {% else %}
@@ -268,9 +268,9 @@
           {% endif %}
         </td>
         <td class="text-center d-none d-lg-table-cell">
-          {% if prospect.tdm_url %}
+          {% if prospect.effective_tdm_url %}
             {% if user.profile.is_admin %}
-              <a href="{{ prospect.tdm_url }}" target="_blank" rel="noopener" class="text-success" title="Open TDM URL">
+              <a href="{{ prospect.effective_tdm_url }}" target="_blank" rel="noopener" class="text-success" title="Open TDM URL">
                 <i class="bi bi-check-circle-fill fs-5"></i>
               </a>
             {% else %}

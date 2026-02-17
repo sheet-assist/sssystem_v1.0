@@ -1,5 +1,5 @@
 from django import forms
-from .models import County
+from .models import County, State
 
 
 class CountyConfigForm(forms.ModelForm):
@@ -7,15 +7,31 @@ class CountyConfigForm(forms.ModelForm):
         model = County
         fields = [
             'is_active',
-            'available_prospect_types',
             'platform',
-            'uses_realtdm',
-            'uses_auction_calendar',
             'auction_calendar_url',
             'realtdm_url',
-            'foreclosure_url',
-            'taxdeed_url',
+        ]
+
+
+class CountyForm(forms.ModelForm):
+    """Form for creating and editing counties"""
+    class Meta:
+        model = County
+        fields = [
+            'state',
+            'name',
+            'slug',
+            'fips_code',
+            'is_active',
+            'platform',
+            'auction_calendar_url',
+            'realtdm_url',
         ]
         widgets = {
-            'available_prospect_types': forms.TextInput(attrs={'placeholder': "e.g. ['TD']"}),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control'}),
+            'fips_code': forms.TextInput(attrs={'class': 'form-control'}),
+            'auction_calendar_url': forms.URLInput(attrs={'class': 'form-control'}),
+            'realtdm_url': forms.URLInput(attrs={'class': 'form-control'}),
         }
+

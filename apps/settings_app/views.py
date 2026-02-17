@@ -6,6 +6,8 @@ from django.views import View
 from django.views.generic import CreateView, DeleteView, ListView, TemplateView, UpdateView
 
 from apps.accounts.mixins import AdminRequiredMixin
+from apps.prospects.forms import CSVUploadForm
+from apps.prospects.services.csv_import import import_prospects_from_csv
 
 from .forms import FilterCriteriaForm, SSRevenueTierForm
 from .models import FilterCriteria, SSRevenueSetting
@@ -141,3 +143,41 @@ class FinanceSettingsView(FinanceSettingsAccessMixin, TemplateView):
             ),
         )
         return redirect("settings_app:finance")
+
+
+class CSVUploadView(AdminRequiredMixin, TemplateView):
+    template_name = "settings_app/prospect_csv_upload.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.setdefault("form", CSVUploadForm())
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        form = CSVUploadForm(request.POST, request.FILES)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form))
+
+        county = form.cleaned_data["county"]
+        csv_file = form.cleaned_data["csv_file"]
+
+        result = import_prospects_from_csv(csv_file, county, request.user)
+
+        if result["errors"] and result["created"] == 0 and result["skipped"] == 0:
+            for err in result["errors"][:10]:
+                messages.error(request, err["message"])
+        else:
+            summary_parts = []
+            if result["created"]:
+                summary_parts.append(f"{result['created']} prospect(s) created")
+            if result["skipped"]:
+                summary_parts.append(f"{result['skipped']} duplicate(s) skipped")
+            if result["errors"]:
+                summary_parts.append(f"{len(result['errors'])} row error(s)")
+
+            messages.success(request, f"CSV upload complete: {', '.join(summary_parts)}.")
+
+            for err in result["errors"][:10]:
+                messages.warning(request, err["message"])
+
+        return redirect("settings_app:prospect_csv_upload")

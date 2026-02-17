@@ -17,9 +17,9 @@
   <div class="col-md-4">
     <div class="card">
       <div class="card-body">
-        <h5 class="card-title">County Configuration</h5>
-        <p class="text-muted">Manage county URLs and scraping settings</p>
-        <a href="{% url 'admin:locations_county_changelist' %}" class="btn btn-outline-secondary btn-sm">Django Admin</a>
+        <h5 class="card-title">County Management</h5>
+        <p class="text-muted">Manage counties, URLs and scraping settings</p>
+        <a href="{% url 'locations:county_list' %}" class="btn btn-primary btn-sm">Manage Counties</a>
       </div>
     </div>
   </div>
@@ -48,6 +48,15 @@
         <h5 class="card-title">Users</h5>
         <p class="text-muted">Manage user accounts and roles</p>
         <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm">User List</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Upload Prospects</h5>
+        <p class="text-muted">Bulk import prospects from a CSV file</p>
+        <a href="{% url 'settings_app:prospect_csv_upload' %}" class="btn btn-outline-secondary btn-sm">Upload CSV</a>
       </div>
     </div>
   </div>

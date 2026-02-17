@@ -1,16 +1,139 @@
 {% extends 'base.html' %}
+{% load static %}
+
+{% block title %}County Configuration - {{ object.name }}{% endblock %}
 
 {% block content %}
-<div class="row">
-  <div class="col-md-8 offset-md-2">
-    <h2>County Configuration: {{ object.name }}</h2>
-    <form method="post">
-      {% csrf_token %}
-      {{ form.as_p }}
-      <div class="d-flex justify-content-end">
-        <button class="btn btn-primary" type="submit">Save</button>
-      </div>
-    </form>
-  </div>
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div>
+                <a href="{% url 'locations:county_list' %}" class="text-decoration-none">
+                    <i class="fas fa-arrow-left"></i> Back to Counties
+                </a>
+            </div>
+            <h1 class="mt-2">County Configuration</h1>
+            <p class="text-muted">{{ object.name }}, {{ object.state.abbreviation }}</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Configuration Settings</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+
+                        <!-- Status -->
+                        <fieldset class="mb-4">
+                            <legend class="h6 mb-3">Status</legend>
+                            <div class="form-check">
+                                {{ form.is_active }}
+                                <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                    County is Active
+                                </label>
+                            </div>
+                        </fieldset>
+
+                        <!-- Platform Configuration -->
+                        <fieldset class="mb-4">
+                            <legend class="h6 mb-3">Platform Configuration</legend>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.platform.id_for_label }}" class="form-label">Primary Platform</label>
+                                {{ form.platform }}
+                                {% if form.platform.errors %}
+                                <div class="invalid-feedback d-block">{{ form.platform.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </fieldset>
+
+                        <!-- Prospect Types -->
+                        <fieldset class="mb-4">
+                            <legend class="h6 mb-3">Data Source URLs</legend>
+
+                            <div class="mb-3">
+                                <label for="{{ form.realtdm_url.id_for_label }}" class="form-label">RealTDM URL</label>
+                                {{ form.realtdm_url }}
+                                <small class="text-muted">URL for the RealTDM data source</small>
+                                {% if form.realtdm_url.errors %}
+                                <div class="invalid-feedback d-block">{{ form.realtdm_url.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="{{ form.auction_calendar_url.id_for_label }}" class="form-label">Auction Calendar URL</label>
+                                {{ form.auction_calendar_url }}
+                                <small class="text-muted">URL for the auction calendar source</small>
+                                {% if form.auction_calendar_url.errors %}
+                                <div class="invalid-feedback d-block">{{ form.auction_calendar_url.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </fieldset>
+
+                        <!-- Buttons -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Configuration
+                            </button>
+                            <a href="{% url 'locations:county_detail' object.pk %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Panel -->
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">County Information</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="mb-0">
+                        <dt class="text-muted">Name</dt>
+                        <dd>{{ object.name }}</dd>
+                        
+                        <dt class="text-muted">State</dt>
+                        <dd>{{ object.state.name }} ({{ object.state.abbreviation }})</dd>
+                        
+                        <dt class="text-muted">FIPS Code</dt>
+                        <dd>{{ object.fips_code|default:"—" }}</dd>
+                        
+                        <dt class="text-muted">Slug</dt>
+                        <dd><code>{{ object.slug }}</code></dd>
+                        
+                        <dt class="text-muted">Last Scraped</dt>
+                        <dd>
+                            {% if object.last_scraped %}
+                            {{ object.last_scraped|date:"M d, Y H:i" }}
+                            {% else %}
+                            Never
+                            {% endif %}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Actions</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'locations:county_detail' object.pk %}" class="btn btn-sm btn-outline-primary w-100 mb-2">
+                        <i class="fas fa-edit"></i> Edit County
+                    </a>
+                    <a href="{% url 'locations:county_delete' object.pk %}" class="btn btn-sm btn-outline-danger w-100">
+                        <i class="fas fa-trash"></i> Delete County
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if form.instance.pk %}Edit County{% else %}Create County{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>
+                {% if form.instance.pk %}
+                    Edit County: {{ form.instance.name }}
+                {% else %}
+                    Create New County
+                {% endif %}
+            </h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- Basic Information -->
+                        <fieldset class="mb-4">
+                            <legend class="h5 mb-3">Basic Information</legend>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.state.id_for_label }}" class="form-label">State *</label>
+                                {{ form.state }}
+                                {% if form.state.errors %}
+                                <div class="invalid-feedback d-block">{{ form.state.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="{{ form.name.id_for_label }}" class="form-label">County Name *</label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                <div class="invalid-feedback d-block">{{ form.name.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="{{ form.slug.id_for_label }}" class="form-label">Slug *</label>
+                                {{ form.slug }}
+                                <small class="text-muted">URL-friendly identifier for the county</small>
+                                {% if form.slug.errors %}
+                                <div class="invalid-feedback d-block">{{ form.slug.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="{{ form.fips_code.id_for_label }}" class="form-label">FIPS Code</label>
+                                {{ form.fips_code }}
+                                <small class="text-muted">Federal Information Processing Standards code</small>
+                                {% if form.fips_code.errors %}
+                                <div class="invalid-feedback d-block">{{ form.fips_code.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </fieldset>
+
+                        <!-- Configuration -->
+                        <fieldset class="mb-4">
+                            <legend class="h5 mb-3">Configuration</legend>
+
+                            <div class="mb-3">
+                                <label for="{{ form.platform.id_for_label }}" class="form-label">Platform</label>
+                                {{ form.platform }}
+                                {% if form.platform.errors %}
+                                <div class="invalid-feedback d-block">{{ form.platform.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </fieldset>
+
+                        <!-- URLs -->
+                        <fieldset class="mb-4">
+                            <legend class="h5 mb-3">Data Source URLs</legend>
+
+                            <div class="mb-3">
+                                <label for="{{ form.realtdm_url.id_for_label }}" class="form-label">RealTDM URL</label>
+                                {{ form.realtdm_url }}
+                                {% if form.realtdm_url.errors %}
+                                <div class="invalid-feedback d-block">{{ form.realtdm_url.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="{{ form.auction_calendar_url.id_for_label }}" class="form-label">Auction Calendar URL</label>
+                                {{ form.auction_calendar_url }}
+                                {% if form.auction_calendar_url.errors %}
+                                <div class="invalid-feedback d-block">{{ form.auction_calendar_url.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </fieldset>
+
+                        <!-- Status -->
+                        <fieldset class="mb-4">
+                            <legend class="h5 mb-3">Status</legend>
+                            
+                            <div class="form-check">
+                                {{ form.is_active }}
+                                <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                    Active
+                                </label>
+                            </div>
+                        </fieldset>
+
+                        <!-- Buttons -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i>
+                                {% if form.instance.pk %}Update{% else %}Create{% endif %} County
+                            </button>
+                            <a href="{% url 'locations:county_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Panel -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Help</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Field Descriptions</h6>
+                    <dl class="small">
+                        <dt>Slug</dt>
+                        <dd>A URL-friendly identifier. Use hyphens instead of spaces.</dd>
+                        
+                        <dt>FIPS Code</dt>
+                        <dd>The Federal Information Processing Standards code for the county.</dd>
+                        
+                        <dt>Platform</dt>
+                        <dd>The primary data source platform for this county.</dd>
+                        
+                        <dt>URLs</dt>
+                        <dd>Links to the data sources for scraping and data retrieval.</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

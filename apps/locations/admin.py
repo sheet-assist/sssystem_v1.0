@@ -19,10 +19,8 @@ class CountyAdmin(admin.ModelAdmin):
         (None, {"fields": ("state", "name", "slug", "fips_code", "is_active")}),
         ("Configuration", {
             "fields": (
-                "available_prospect_types", "platform",
-                "uses_realtdm", "uses_auction_calendar",
+                "platform",
                 "auction_calendar_url", "realtdm_url",
-                "foreclosure_url", "taxdeed_url",
             )
         }),
         ("Scraping", {"fields": ("last_scraped",)}),

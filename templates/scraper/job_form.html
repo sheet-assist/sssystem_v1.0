@@ -128,12 +128,19 @@ document.addEventListener('DOMContentLoaded', function() {
       Array.from(countiesSelect.selectedOptions).map(opt => opt.value)
     );
 
-    const url = countriesUrlTemplate.replace('__STATE__', stateCode);
+    let url = countriesUrlTemplate.replace('__STATE__', stateCode);
+    
+    // Get job_type if available
+    const jobTypeSelect = document.getElementById('id_job_type');
+    if (jobTypeSelect && jobTypeSelect.value) {
+      url += '?job_type=' + encodeURIComponent(jobTypeSelect.value);
+    }
+    
     try {
       const response = await fetch(url);
       const data = await response.json();
       countiesSelect.innerHTML = data.counties.map(c => 
-        `<option value="${c.id}" ${previouslySelected.has(String(c.id)) ? 'selected' : ''}>${c.name}</option>`
+        `<option value="${c.id}" ${previouslySelected.has(String(c.id)) ? 'selected' : ''}>${c.display_name || c.name}</option>`
       ).join('');
       updateCountiesSummary();
       countiesStatus.textContent = `${data.counties.length} counties available`;
@@ -164,6 +171,17 @@ document.addEventListener('DOMContentLoaded', function() {
     Array.from(countiesSelect.options).forEach(opt => opt.selected = false);
     countiesSelect.dispatchEvent(new Event('change'));
   });
+
+  // Handle job_type changes to reload counties with new URLs
+  const jobTypeSelect = document.getElementById('id_job_type');
+  if (jobTypeSelect) {
+    jobTypeSelect.addEventListener('change', () => {
+      // Reload counties if state is already selected
+      if (stateSelect.value) {
+        stateSelect.dispatchEvent(new Event('change'));
+      }
+    });
+  }
 
   updateCountiesSummary();
   if (stateSelect.value) {

@@ -241,10 +241,12 @@
 
     const populateCounties = (items) => {
       countiesSelect.innerHTML = '';
-      items.forEach(({ id, name }) => {
+      items.forEach(({ id, display_name, name, url }) => {
         const option = document.createElement('option');
         option.value = id;
-        option.textContent = name;
+        // Use display_name if available (includes URL), otherwise fallback to name
+        option.textContent = display_name || name;
+        option.dataset.url = url || '';
         countiesSelect.appendChild(option);
       });
       countiesSelect.disabled = items.length === 0;
@@ -276,7 +278,13 @@
         filterInput.disabled = true;
       }
 
-      const url = urlTemplate.replace('__STATE__', stateCode);
+      let url = urlTemplate.replace('__STATE__', stateCode);
+      
+      // Get job_type if available
+      const jobTypeSelect = document.getElementById('id_job_type');
+      if (jobTypeSelect && jobTypeSelect.value) {
+        url += '?job_type=' + encodeURIComponent(jobTypeSelect.value);
+      }
 
       fetch(url)
         .then((response) => response.json())
@@ -360,6 +368,17 @@
         if (target) {
           event.preventDefault();
           handleChipRemoval(target.dataset.countyValue);
+        }
+      });
+    }
+
+    // Handle job_type changes to reload counties with new URLs
+    const jobTypeSelect = document.getElementById('id_job_type');
+    if (jobTypeSelect) {
+      jobTypeSelect.addEventListener('change', () => {
+        // Reload counties if state is already selected
+        if (stateSelect.value) {
+          stateSelect.dispatchEvent(new Event('change'));
         }
       });
     }

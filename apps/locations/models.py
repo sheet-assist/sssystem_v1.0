@@ -29,13 +29,8 @@ class County(models.Model):
     last_scraped = models.DateTimeField(blank=True, null=True)
 
     # County configuration
-    available_prospect_types = models.JSONField(default=list, blank=True)
-    uses_realtdm = models.BooleanField(default=False)
-    uses_auction_calendar = models.BooleanField(default=False)
     auction_calendar_url = models.URLField(blank=True, default="")
     realtdm_url = models.URLField(blank=True, default="")
-    foreclosure_url = models.URLField(blank=True, default="")
-    taxdeed_url = models.URLField(blank=True, default="")
     platform = models.CharField(max_length=32, choices=PLATFORM_CHOICES, default="other")
 
     class Meta:

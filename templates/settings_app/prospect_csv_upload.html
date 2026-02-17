@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Upload Prospects CSV{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'settings_app:home' %}">Settings</a></li>
+        <li class="breadcrumb-item active">Upload Prospects CSV</li>
+      </ol>
+    </nav>
+
+    <h2><i class="bi bi-file-earmark-arrow-up"></i> Upload Prospects CSV</h2>
+
+    <div class="card mt-3">
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data" id="csv-upload-form" novalidate>
+          {% csrf_token %}
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}
+            <p class="mb-0">{{ error }}</p>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          {% url 'scraper:counties_ajax_api' '__STATE__' as counties_url_template %}
+
+          <div class="mb-3">
+            <label for="id_state" class="form-label">State</label>
+            <select name="state" id="id_state" class="form-select" data-counties-url-template="{{ counties_url_template }}">
+              <option value="">-- Choose a state --</option>
+              {% for state in form.fields.state.queryset %}
+              <option value="{{ state.pk }}" data-state-code="{{ state.abbreviation }}" {% if form.state.value|stringformat:"s" == state.pk|stringformat:"s" %}selected{% endif %}>
+                {{ state.name }} ({{ state.abbreviation }})
+              </option>
+              {% endfor %}
+            </select>
+            {% if form.state.errors %}<div class="text-danger small">{{ form.state.errors.0 }}</div>{% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="id_county" class="form-label">County</label>
+            <select name="county" id="id_county" class="form-select" disabled>
+              <option value="">-- Choose a county --</option>
+            </select>
+            {% if form.county.errors %}<div class="text-danger small">{{ form.county.errors.0 }}</div>{% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="id_csv_file" class="form-label">CSV File</label>
+            {{ form.csv_file }}
+            {% if form.csv_file.errors %}<div class="text-danger small">{{ form.csv_file.errors.0 }}</div>{% endif %}
+            <div class="form-text">Maximum file size: 5 MB</div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" id="btn-upload">
+            <i class="bi bi-upload"></i> Upload
+          </button>
+          <a href="{% url 'settings_app:home' %}" class="btn btn-secondary">Cancel</a>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header">
+        <h6 class="mb-0">CSV Format Instructions</h6>
+      </div>
+      <div class="card-body">
+        <p class="mb-2">Your CSV file must include a header row. The following columns are supported:</p>
+        <table class="table table-sm table-bordered">
+          <thead class="table-light">
+            <tr><th>Column</th><th>Required</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>case_number</code></td><td>Yes</td><td></td></tr>
+            <tr><td><code>prospect_type</code></td><td>Yes</td><td>TD, TL, SS, or MF</td></tr>
+            <tr><td><code>auction_date</code></td><td>Yes</td><td>MM/DD/YYYY or YYYY-MM-DD</td></tr>
+            <tr><td><code>case_style</code></td><td>No</td><td></td></tr>
+            <tr><td><code>property_address</code></td><td>No</td><td></td></tr>
+            <tr><td><code>city</code></td><td>No</td><td></td></tr>
+            <tr><td><code>zip_code</code></td><td>No</td><td></td></tr>
+            <tr><td><code>parcel_id</code></td><td>No</td><td></td></tr>
+            <tr><td><code>final_judgment_amount</code></td><td>No</td><td>Numeric (e.g. 15000.00)</td></tr>
+            <tr><td><code>opening_bid</code></td><td>No</td><td>Numeric</td></tr>
+            <tr><td><code>assessed_value</code></td><td>No</td><td>Numeric</td></tr>
+            <tr><td><code>plaintiff_name</code></td><td>No</td><td></td></tr>
+            <tr><td><code>defendant_name</code></td><td>No</td><td></td></tr>
+            <tr><td><code>auction_status</code></td><td>No</td><td></td></tr>
+            <tr><td><code>auction_time</code></td><td>No</td><td>HH:MM format</td></tr>
+          </tbody>
+        </table>
+        <p class="mb-1"><strong>County</strong> is selected from the form above &mdash; it is not a CSV column.</p>
+        <p class="mb-0"><strong>Duplicates</strong> (same county + case_number + auction_date) are automatically skipped.</p>
+        <a href="{% static 'sample_data/sample_prospects.csv' %}" download class="btn btn-outline-secondary btn-sm mt-2">
+          <i class="bi bi-download"></i> Download Sample CSV
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const stateSelect = document.getElementById('id_state');
+  const countySelect = document.getElementById('id_county');
+  const urlTemplate = stateSelect.dataset.countiesUrlTemplate;
+
+  function clearCounties(msg) {
+    countySelect.innerHTML = '<option value="">' + msg + '</option>';
+    countySelect.disabled = true;
+  }
+
+  stateSelect.addEventListener('change', function () {
+    const selected = stateSelect.options[stateSelect.selectedIndex];
+    const stateCode = selected ? selected.dataset.stateCode : '';
+
+    if (!stateCode) {
+      clearCounties('-- Choose a county --');
+      return;
+    }
+
+    clearCounties('Loading counties...');
+
+    fetch(urlTemplate.replace('__STATE__', stateCode))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.success && data.counties && data.counties.length) {
+          countySelect.innerHTML = '<option value="">-- Choose a county --</option>';
+          data.counties.forEach(function (c) {
+            var opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.name;
+            countySelect.appendChild(opt);
+          });
+          countySelect.disabled = false;
+        } else {
+          clearCounties('No counties found');
+        }
+      })
+      .catch(function () {
+        clearCounties('Error loading counties');
+      });
+  });
+
+  // If state was pre-selected (e.g. validation error), trigger load
+  if (stateSelect.value) {
+    stateSelect.dispatchEvent(new Event('change'));
+  }
+});
+</script>
+{% endblock %}
