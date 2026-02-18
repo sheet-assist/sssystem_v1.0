@@ -1,10 +1,13 @@
-from datetime import timedelta
+import calendar
+from datetime import date, timedelta
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count, Q, Sum
 from django.db.models import DateField
 from django.db.models.functions import Cast, Coalesce, TruncDay, TruncMonth, TruncYear
+from django.http import JsonResponse
 from django.utils import timezone
+from django.views import View
 from django.views.generic import TemplateView
 
 from apps.cases.models import Case, CaseActionLog
@@ -134,6 +137,55 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         return {"labels": labels, "datasets": datasets, "details": details}
 
+    @staticmethod
+    def _build_daily_qualified(prospect_qs, start_date, end_date):
+        """Return daily qualified/disqualified counts between start_date and end_date."""
+        qualified_rows = (
+            prospect_qs.filter(
+                qualification_date__date__gte=start_date,
+                qualification_date__date__lte=end_date,
+            )
+            .annotate(day=TruncDay("qualification_date"))
+            .values("day")
+            .annotate(count=Count("id"))
+            .order_by("day")
+        )
+        disqualified_rows = (
+            prospect_qs.filter(
+                disqualification_date__date__gte=start_date,
+                disqualification_date__date__lte=end_date,
+            )
+            .annotate(day=TruncDay("disqualification_date"))
+            .values("day")
+            .annotate(count=Count("id"))
+            .order_by("day")
+        )
+        day_counts = {
+            row["day"].date().isoformat(): row["count"]
+            for row in qualified_rows
+            if row.get("day")
+        }
+        disqualified_day_counts = {
+            row["day"].date().isoformat(): row["count"]
+            for row in disqualified_rows
+            if row.get("day")
+        }
+        labels = []
+        qualified_counts = []
+        disqualified_counts = []
+        num_days = (end_date - start_date).days + 1
+        for offset in range(num_days):
+            day = start_date + timedelta(days=offset)
+            key = day.isoformat()
+            labels.append(key)
+            qualified_counts.append(day_counts.get(key, 0))
+            disqualified_counts.append(disqualified_day_counts.get(key, 0))
+        return {
+            "labels": labels,
+            "qualified_counts": qualified_counts,
+            "disqualified_counts": disqualified_counts,
+        }
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         user = self.request.user
@@ -158,50 +210,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # Daily qualified trend (last 30 days)
         today = timezone.localdate()
         start_date = today - timedelta(days=29)
-        qualified_rows = (
-            prospect_qs.filter(
-                qualification_date__date__gte=start_date,
-                qualification_date__date__lte=today,
-            )
-            .annotate(day=TruncDay("qualification_date"))
-            .values("day")
-            .annotate(count=Count("id"))
-            .order_by("day")
+        ctx["daily_qualified_chart"] = self._build_daily_qualified(
+            prospect_qs, start_date, today
         )
-        disqualified_rows = (
-            prospect_qs.filter(
-                disqualification_date__date__gte=start_date,
-                disqualification_date__date__lte=today,
-            )
-            .annotate(day=TruncDay("disqualification_date"))
-            .values("day")
-            .annotate(count=Count("id"))
-            .order_by("day")
-        )
-        day_counts = {
-            row["day"].date().isoformat(): row["count"]
-            for row in qualified_rows
-            if row.get("day")
-        }
-        disqualified_day_counts = {
-            row["day"].date().isoformat(): row["count"]
-            for row in disqualified_rows
-            if row.get("day")
-        }
-        labels = []
-        qualified_counts = []
-        disqualified_counts = []
-        for offset in range(30):
-            day = start_date + timedelta(days=offset)
-            key = day.isoformat()
-            labels.append(key)
-            qualified_counts.append(day_counts.get(key, 0))
-            disqualified_counts.append(disqualified_day_counts.get(key, 0))
-        ctx["daily_qualified_chart"] = {
-            "labels": labels,
-            "qualified_counts": qualified_counts,
-            "disqualified_counts": disqualified_counts,
-        }
 
         # Pipeline by workflow_status — list of (label, count) for template
         pipeline_dict = {}
@@ -293,3 +304,48 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         ctx["is_admin"] = is_admin
         return ctx
+
+
+class DailyQualifiedChartAPI(LoginRequiredMixin, View):
+    """Return daily qualified chart data as JSON for a given date range."""
+
+    def get(self, request):
+        today = timezone.localdate()
+        mode = request.GET.get("mode", "30days")  # '30days' or 'month'
+
+        if mode == "month":
+            # Parse year/month, default to current
+            try:
+                year = int(request.GET.get("year", today.year))
+                month = int(request.GET.get("month", today.month))
+            except (ValueError, TypeError):
+                year, month = today.year, today.month
+            start_date = date(year, month, 1)
+            last_day = calendar.monthrange(year, month)[1]
+            end_date = date(year, month, last_day)
+            # Cap end_date at today
+            if end_date > today:
+                end_date = today
+            period_label = start_date.strftime("%B %Y")
+        else:
+            # 30-day sliding window
+            try:
+                start_date = date.fromisoformat(request.GET.get("start", ""))
+                end_date = date.fromisoformat(request.GET.get("end", ""))
+            except (ValueError, TypeError):
+                end_date = today
+                start_date = end_date - timedelta(days=29)
+            # Cap end_date at today
+            if end_date > today:
+                end_date = today
+                start_date = end_date - timedelta(days=29)
+            period_label = f"{start_date.strftime('%b %d, %Y')} \u2013 {end_date.strftime('%b %d, %Y')}"
+
+        prospect_qs = Prospect.objects.all()
+        data = DashboardView._build_daily_qualified(prospect_qs, start_date, end_date)
+        data["start"] = start_date.isoformat()
+        data["end"] = end_date.isoformat()
+        data["period_label"] = period_label
+        data["mode"] = mode
+        data["is_latest"] = end_date >= today
+        return JsonResponse(data)

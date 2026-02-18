@@ -70,8 +70,21 @@
 
 {# --- Daily Qualified Trend --- #}
 <div class="card mb-4">
-  <div class="card-header">
-    <strong>Daily Qualified Count (Last 30 Days)</strong>
+  <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <strong>Daily Qualified Count</strong>
+    <div class="d-flex align-items-center gap-2">
+      <div class="btn-group btn-group-sm" role="group" aria-label="Daily Qualified Period">
+        <button type="button" class="btn btn-outline-success active" data-dq-mode="30days">30 Days</button>
+        <button type="button" class="btn btn-outline-success" data-dq-mode="month">Month</button>
+      </div>
+      <div class="d-flex align-items-center gap-1">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="dqPrev" title="Previous">&laquo;</button>
+        <span class="badge bg-light text-dark border px-2 py-1" id="dqPeriodLabel" style="min-width:180px;text-align:center;font-size:.82rem;">
+          Loading…
+        </span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="dqNext" title="Next">&raquo;</button>
+      </div>
+    </div>
   </div>
   <div class="card-body py-2">
     <div class="position-relative" style="height: 180px;">
@@ -324,6 +337,105 @@
             },
           },
         },
+      });
+
+      // --- Daily Qualified chart navigation ---
+      const dqPeriodLabel = document.getElementById("dqPeriodLabel");
+      const dqPrevBtn = document.getElementById("dqPrev");
+      const dqNextBtn = document.getElementById("dqNext");
+      const dqModeButtons = document.querySelectorAll("[data-dq-mode]");
+      const DQ_API_URL = "{% url 'dashboard:daily_qualified_api' %}";
+
+      // State
+      let dqMode = "30days";
+      let dqStart = dailyData.labels?.[0] || null;
+      let dqEnd = dailyData.labels?.[dailyData.labels.length - 1] || null;
+
+      // Derive initial period label
+      function formatLabel(start, end) {
+        const opts = { month: "short", day: "numeric", year: "numeric" };
+        const s = new Date(start + "T00:00:00");
+        const e = new Date(end + "T00:00:00");
+        return s.toLocaleDateString("en-US", opts) + " \u2013 " + e.toLocaleDateString("en-US", opts);
+      }
+      if (dqStart && dqEnd) {
+        dqPeriodLabel.textContent = formatLabel(dqStart, dqEnd);
+      }
+      dqNextBtn.disabled = true; // initial load is latest
+
+      function updateDqChart(data) {
+        const chart = window.dailyQualifiedChart;
+        chart.data.labels = data.labels || [];
+        chart.data.datasets[0].data = data.qualified_counts || [];
+        chart.data.datasets[1].data = data.disqualified_counts || [];
+        chart.update();
+        dqStart = data.start;
+        dqEnd = data.end;
+        dqPeriodLabel.textContent = data.period_label || "";
+        dqNextBtn.disabled = !!data.is_latest;
+      }
+
+      async function fetchDq(params) {
+        const qs = new URLSearchParams(params).toString();
+        try {
+          const resp = await fetch(`${DQ_API_URL}?${qs}`);
+          if (!resp.ok) return;
+          const data = await resp.json();
+          updateDqChart(data);
+        } catch (e) {
+          console.error("Failed to fetch daily qualified data", e);
+        }
+      }
+
+      // Mode toggle
+      dqModeButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          dqModeButtons.forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          dqMode = btn.dataset.dqMode;
+          // Fetch latest for chosen mode
+          if (dqMode === "month") {
+            const today = new Date();
+            fetchDq({ mode: "month", year: today.getFullYear(), month: today.getMonth() + 1 });
+          } else {
+            fetchDq({ mode: "30days" });
+          }
+        });
+      });
+
+      // Helper to shift dates
+      function addDays(dateStr, days) {
+        const d = new Date(dateStr + "T00:00:00");
+        d.setDate(d.getDate() + days);
+        return d.toISOString().slice(0, 10);
+      }
+
+      function shiftMonth(dateStr, delta) {
+        const d = new Date(dateStr + "T00:00:00");
+        d.setMonth(d.getMonth() + delta);
+        return { year: d.getFullYear(), month: d.getMonth() + 1 };
+      }
+
+      dqPrevBtn.addEventListener("click", () => {
+        if (dqMode === "month") {
+          const prev = shiftMonth(dqStart, -1);
+          fetchDq({ mode: "month", year: prev.year, month: prev.month });
+        } else {
+          const newEnd = addDays(dqStart, -1);
+          const newStart = addDays(newEnd, -29);
+          fetchDq({ mode: "30days", start: newStart, end: newEnd });
+        }
+      });
+
+      dqNextBtn.addEventListener("click", () => {
+        if (dqMode === "month") {
+          const nxt = shiftMonth(dqStart, 1);
+          fetchDq({ mode: "month", year: nxt.year, month: nxt.month });
+        } else {
+          const newStart = addDays(dqEnd, 1);
+          const newEnd = addDays(newStart, 29);
+          fetchDq({ mode: "30days", start: newStart, end: newEnd });
+        }
       });
     }
 

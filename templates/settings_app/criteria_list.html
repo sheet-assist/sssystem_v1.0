@@ -19,7 +19,27 @@
         <div class="card-header bg-light border-bottom p-2">
           <div class="d-flex justify-content-between align-items-start">
             <div>
-              <h6 class="card-title mb-1">{{ rule.name }}</h6>
+              <h6 class="card-title mb-1">
+                {{ rule.name }}
+                {% if rule.state %}
+                  <span class="badge bg-info text-dark ms-1">{{ rule.state.abbreviation }}</span>
+                {% endif %}
+              </h6>
+              <small class="text-muted d-block mb-1">
+                {% with county_list=rule.counties.all %}
+                  {% if county_list %}
+                    {% if rule.state and county_list|length == rule.state.counties.count %}
+                      <span class="badge bg-dark">All Counties</span>
+                    {% else %}
+                      {% for c in county_list %}
+                        <span class="badge bg-dark">{{ c.name }}</span>
+                      {% endfor %}
+                    {% endif %}
+                  {% elif rule.county %}
+                    <span class="badge bg-dark">{{ rule.county.name }}</span>
+                  {% endif %}
+                {% endwith %}
+              </small>
               <small class="text-muted">
                 {% if rule.prospect_types %}
                   <span class="badge bg-secondary">{{ rule.prospect_types|join:", " }}</span>

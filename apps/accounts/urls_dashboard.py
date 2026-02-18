@@ -6,4 +6,5 @@ app_name = "dashboard"
 
 urlpatterns = [
     path("", views_dashboard.DashboardView.as_view(), name="home"),
+    path("api/daily-qualified/", views_dashboard.DailyQualifiedChartAPI.as_view(), name="daily_qualified_api"),
 ]

@@ -5,8 +5,8 @@
 module.exports = {
   "state": "FL",
   "doc_type": "TD",
-  "start_date": "2025-01-01",
-  "end_date": "2025-12-31",
+  "start_date": "2023-01-01",
+  "end_date": "2024-12-31",
   "counties": ["Miami-Dade"],
   "chunk_days": 1,
   "group_name": "td_backfill_feb_2026_miami_dade",
