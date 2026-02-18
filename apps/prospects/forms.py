@@ -20,6 +20,11 @@ class CSVUploadForm(forms.Form):
         widget=forms.Select(attrs={"class": "form-select", "id": "id_county"}),
         empty_label="-- Choose a county --",
     )
+    source = forms.ChoiceField(
+        choices=Prospect.SOURCE_CHOICES,
+        widget=forms.Select(attrs={"class": "form-select", "id": "id_source", "required": "required"}),
+        required=True,
+    )
     csv_file = forms.FileField(
         widget=forms.ClearableFileInput(attrs={"class": "form-control", "accept": ".csv"}),
         help_text="Upload a .csv file (max 5 MB).",

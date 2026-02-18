@@ -29,14 +29,17 @@ COLUMN_MAP = {
     "defendant_name": "defendant_name",
     "auction_status": "auction_status",
     "auction_time": "auction_time",
+    "sale_amount": "sale_amount",
+    "sold_to": "sold_to",
 }
 
-DECIMAL_FIELDS = {"final_judgment_amount", "opening_bid", "assessed_value"}
+DECIMAL_FIELDS = {"final_judgment_amount", "opening_bid", "assessed_value", "sale_amount"}
 
 TEXT_FIELDS = {
     "case_number", "case_style", "property_address", "city",
     "zip_code", "parcel_id", "plaintiff_name", "defendant_name",
 }
+TEXT_FIELDS = TEXT_FIELDS.union({"sold_to"})
 
 
 def _parse_date(value):
@@ -158,7 +161,7 @@ def _validate_row(row_num, row, headers):
     return data, []
 
 
-def import_prospects_from_csv(csv_file, county, uploaded_by):
+def import_prospects_from_csv(csv_file, county, uploaded_by, source=None, upload_log=None):
     """
     Import prospects from an uploaded CSV file.
 
@@ -171,6 +174,7 @@ def import_prospects_from_csv(csv_file, county, uploaded_by):
         dict with keys: created (int), skipped (int), errors (list of dicts).
     """
     result = {"created": 0, "skipped": 0, "errors": []}
+    result["total_rows"] = 0
 
     try:
         content = csv_file.read().decode("utf-8-sig")
@@ -197,6 +201,7 @@ def import_prospects_from_csv(csv_file, county, uploaded_by):
         return result
 
     for row_num, row in enumerate(reader, start=2):  # row 1 is header
+        result["total_rows"] += 1
         # Normalize keys
         row = {k.strip().lower(): v for k, v in row.items() if k}
 
@@ -208,11 +213,44 @@ def import_prospects_from_csv(csv_file, county, uploaded_by):
 
         # Build prospect kwargs
         prospect_kwargs = {"county": county, "state": county.state.abbreviation}
+        if source:
+            prospect_kwargs["source"] = source
         for csv_col, model_field in COLUMN_MAP.items():
             if csv_col in data:
                 prospect_kwargs[model_field] = data[csv_col]
 
+        # Derive surplus_amount when sale_amount and at least one liability field are present.
+        # For Tax Deed (TD) use sale_amount - opening_bid. Otherwise prefer
+        # final_judgment_amount, then plaintiff_max_bid, then opening_bid.
+        sale_amt = prospect_kwargs.get("sale_amount")
+        if sale_amt is not None:
+            try:
+                pt = (prospect_kwargs.get("prospect_type") or "").upper()
+            except Exception:
+                pt = ""
+
+            surplus_val = None
+            if pt == "TD":
+                ob = prospect_kwargs.get("opening_bid")
+                if ob is not None:
+                    surplus_val = sale_amt - ob
+            else:
+                liability = None
+                if prospect_kwargs.get("final_judgment_amount") is not None:
+                    liability = prospect_kwargs.get("final_judgment_amount")
+                elif prospect_kwargs.get("plaintiff_max_bid") is not None:
+                    liability = prospect_kwargs.get("plaintiff_max_bid")
+                elif prospect_kwargs.get("opening_bid") is not None:
+                    liability = prospect_kwargs.get("opening_bid")
+                if liability is not None:
+                    surplus_val = sale_amt - liability
+
+            if surplus_val is not None:
+                prospect_kwargs["surplus_amount"] = surplus_val
+
         try:
+            if upload_log is not None:
+                prospect_kwargs["uploaded_from"] = upload_log
             prospect = Prospect.objects.create(**prospect_kwargs)
             log_prospect_action(
                 prospect=prospect,

@@ -9,6 +9,9 @@ from django.views.generic import CreateView, DeleteView, ListView, TemplateView,
 from apps.accounts.mixins import AdminRequiredMixin
 from apps.prospects.forms import CSVUploadForm
 from apps.prospects.services.csv_import import import_prospects_from_csv
+from apps.prospects.models import CSVUploadLog
+from .models import FilterCriteria
+from .services import apply_rule_to_queryset
 
 from .forms import FilterCriteriaForm, SSRevenueTierForm, UserARSTierForm, SurplusThresholdForm
 from .models import FilterCriteria, SSRevenueSetting
@@ -233,8 +236,35 @@ class CSVUploadView(AdminRequiredMixin, TemplateView):
 
         county = form.cleaned_data["county"]
         csv_file = form.cleaned_data["csv_file"]
+        source = form.cleaned_data.get("source")
 
-        result = import_prospects_from_csv(csv_file, county, request.user)
+        # Create a log entry and save the uploaded file before processing so it's preserved.
+        from apps.prospects.models import CSVUploadLog
+
+        upload_log = CSVUploadLog.objects.create(
+            uploaded_by=request.user,
+            state=county.state,
+            county=county,
+            source=source or "",
+            file=csv_file,
+            file_size=getattr(csv_file, "size", None) or 0,
+        )
+
+        # Ensure file pointer is at start for the importer
+        try:
+            csv_file.seek(0)
+        except Exception:
+            pass
+
+        result = import_prospects_from_csv(csv_file, county, request.user, source=source, upload_log=upload_log)
+
+        # Update the upload log with results
+        upload_log.record_count = result.get("total_rows", (result.get("created", 0) + result.get("skipped", 0) + len(result.get("errors", []))))
+        upload_log.created_count = result.get("created", 0)
+        upload_log.skipped_count = result.get("skipped", 0)
+        upload_log.errors_count = len(result.get("errors", []))
+        upload_log.errors = result.get("errors", [])
+        upload_log.save()
 
         if result["errors"] and result["created"] == 0 and result["skipped"] == 0:
             for err in result["errors"][:10]:
@@ -253,4 +283,80 @@ class CSVUploadView(AdminRequiredMixin, TemplateView):
             for err in result["errors"][:10]:
                 messages.warning(request, err["message"])
 
-        return redirect("settings_app:prospect_csv_upload")
+        # After processing, show the upload details (and its prospects) to the user
+        return redirect("settings_app:prospect_upload_prospects", pk=upload_log.pk)
+
+
+class UploadListView(AdminRequiredMixin, ListView):
+    model = CSVUploadLog
+    template_name = "settings_app/upload_list.html"
+    context_object_name = "uploads"
+    paginate_by = 20
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("uploaded_by", "state", "county")
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["rules"] = FilterCriteria.objects.filter(is_active=True).order_by("name")
+        return ctx
+
+
+class ApplyRuleToUploadView(AdminRequiredMixin, View):
+    def post(self, request, pk):
+        rule_pk = request.POST.get("rule")
+        if not rule_pk:
+            from django.contrib import messages
+            messages.error(request, "No rule selected.")
+            return redirect("settings_app:prospect_upload_list")
+
+        try:
+            rule = FilterCriteria.objects.get(pk=int(rule_pk))
+        except Exception:
+            from django.contrib import messages
+            messages.error(request, "Selected rule not found.")
+            return redirect("settings_app:prospect_upload_list")
+
+        from apps.prospects.models import Prospect, CSVUploadLog
+
+        upload = CSVUploadLog.objects.filter(pk=pk).first()
+        if not upload:
+            from django.contrib import messages
+            messages.error(request, "Upload not found.")
+            return redirect("settings_app:prospect_upload_list")
+
+        qs = Prospect.objects.filter(uploaded_from=upload)
+        summary = apply_rule_to_queryset(rule, qs, acting_user=request.user)
+
+        from django.contrib import messages
+        messages.success(
+            request,
+            f"Applied rule '{rule.name}' to upload {upload.pk}: processed={summary['processed']}, updated={summary['updated']}, qualified={summary['qualified']}, disqualified={summary['disqualified']}.",
+        )
+
+        return redirect("settings_app:prospect_upload_prospects", pk=upload.pk)
+
+
+class UploadProspectsListView(AdminRequiredMixin, ListView):
+    model = __import__("apps.prospects.models", fromlist=["Prospect"]).prospects.models.Prospect if False else None
+    template_name = "settings_app/upload_prospects_list.html"
+    context_object_name = "prospects"
+    paginate_by = 25
+
+    def dispatch(self, request, *args, **kwargs):
+        # load Prospect model lazily to avoid circular import at module load time
+        from apps.prospects.models import Prospect  # local import
+        self.model = Prospect
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        from apps.prospects.models import Prospect
+        upload_pk = self.kwargs.get("pk")
+        return Prospect.objects.filter(uploaded_from_id=upload_pk).select_related("county", "assigned_to").order_by("-created_at")
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        from apps.prospects.models import CSVUploadLog
+        upload = CSVUploadLog.objects.filter(pk=self.kwargs.get("pk")).first()
+        ctx["upload"] = upload
+        return ctx

@@ -52,6 +52,13 @@
           </div>
 
           <div class="mb-3">
+            <label for="id_source" class="form-label">Source</label>
+            {{ form.source }}
+            {% if form.source.errors %}<div class="text-danger small">{{ form.source.errors.0 }}</div>{% endif %}
+            <div class="form-text">Required. Choose where these prospects originated.</div>
+          </div>
+
+          <div class="mb-3">
             <label for="id_csv_file" class="form-label">CSV File</label>
             {{ form.csv_file }}
             {% if form.csv_file.errors %}<div class="text-danger small">{{ form.csv_file.errors.0 }}</div>{% endif %}
@@ -88,6 +95,8 @@
             <tr><td><code>final_judgment_amount</code></td><td>No</td><td>Numeric (e.g. 15000.00)</td></tr>
             <tr><td><code>opening_bid</code></td><td>No</td><td>Numeric</td></tr>
             <tr><td><code>assessed_value</code></td><td>No</td><td>Numeric</td></tr>
+            <tr><td><code>sale_amount</code></td><td>No</td><td>Numeric (sale / sold amount)</td></tr>
+            <tr><td><code>sold_to</code></td><td>No</td><td>Name of buyer (text)</td></tr>
             <tr><td><code>plaintiff_name</code></td><td>No</td><td></td></tr>
             <tr><td><code>defendant_name</code></td><td>No</td><td></td></tr>
             <tr><td><code>auction_status</code></td><td>No</td><td></td></tr>

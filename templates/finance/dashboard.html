@@ -1,0 +1,540 @@
+{% extends "base.html" %}
+
+{% block title %}Finance Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+  .kpi-card .kpi-value { font-size: 1.5rem; font-weight: 700; }
+  .kpi-card .kpi-label { font-size: .8rem; color: #6c757d; }
+  .filter-bar { position: sticky; top: 0; z-index: 100; background: #fff; border-bottom: 1px solid #dee2e6; }
+  .type-chip { cursor: pointer; user-select: none; }
+  .type-chip.active { background-color: #0d6efd !important; color: #fff !important; border-color: #0d6efd !important; }
+  .chart-empty-overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.85); z-index: 5; flex-direction: column;
+  }
+  .chart-empty-overlay.d-none { display: none !important; }
+  .chart-wrap { position: relative; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── 1. Header ── #}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">Finance Dashboard</h2>
+  <div class="d-flex align-items-center gap-2">
+    <span class="badge bg-secondary">Tier {{ settings_info.tier_percent }}%</span>
+    <a href="{% url 'settings_app:finance' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-gear"></i> Finance Settings
+    </a>
+  </div>
+</div>
+
+{# ── 2. Filter Bar ── #}
+<div class="filter-bar p-2 mb-3 rounded shadow-sm">
+  <div class="row g-2 align-items-center">
+    {# Date mode toggle + nav #}
+    <div class="col-auto">
+      <div class="btn-group btn-group-sm" id="periodToggle">
+        <button class="btn btn-outline-primary active" data-mode="daily">30 Days</button>
+        <button class="btn btn-outline-primary" data-mode="monthly">Month</button>
+        <button class="btn btn-outline-primary" data-mode="yearly">Year</button>
+      </div>
+    </div>
+    <div class="col-auto">
+      <div class="btn-group btn-group-sm">
+        <button class="btn btn-outline-secondary" id="navPrev" title="Previous">&laquo;</button>
+        <button class="btn btn-outline-secondary disabled" id="periodLabel" style="min-width:160px;"></button>
+        <button class="btn btn-outline-secondary" id="navNext" title="Next">&raquo;</button>
+      </div>
+    </div>
+
+    {# State #}
+    <div class="col-auto">
+      <select id="filterState" class="form-select form-select-sm" style="min-width:140px;">
+        <option value="">All States</option>
+      </select>
+    </div>
+
+    {# County #}
+    <div class="col-auto">
+      <select id="filterCounty" class="form-select form-select-sm" style="min-width:160px;">
+        <option value="">All Counties</option>
+      </select>
+    </div>
+
+    {# Prospect Type chips #}
+    <div class="col-auto d-flex gap-1 flex-wrap" id="typeChips"></div>
+
+    {# Qualification Status #}
+    <div class="col-auto">
+      <select id="filterQualStatus" class="form-select form-select-sm" style="min-width:130px;">
+        <option value="qualified">Qualified</option>
+        <option value="">All</option>
+        <option value="pending">Pending</option>
+        <option value="disqualified">Disqualified</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+{# ── 3. KPI Cards ── #}
+<div class="row g-3 mb-4" id="kpiRow">
+  <div class="col">
+    <div class="card kpi-card text-center h-100">
+      <div class="card-body py-2">
+        <div class="kpi-label">Total Surplus</div>
+        <div class="kpi-value text-primary" id="kpiTotalSurplus">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card kpi-card text-center h-100">
+      <div class="card-body py-2">
+        <div class="kpi-label">SS Revenue</div>
+        <div class="kpi-value text-success" id="kpiSSRevenue">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card kpi-card text-center h-100">
+      <div class="card-body py-2">
+        <div class="kpi-label">ARS Payout</div>
+        <div class="kpi-value text-warning" id="kpiARSPayout">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card kpi-card text-center h-100">
+      <div class="card-body py-2">
+        <div class="kpi-label">SS Net Benefit</div>
+        <div class="kpi-value text-info" id="kpiNetBenefit">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card kpi-card text-center h-100">
+      <div class="card-body py-2">
+        <div class="kpi-label">Avg Surplus / Prospect</div>
+        <div class="kpi-value" id="kpiAvgSurplus">—</div>
+        <div class="kpi-label" id="kpiProspectCount"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── 4. Revenue Over Time ── #}
+<div class="card mb-4">
+  <div class="card-body">
+    <h6 class="card-title">Revenue Over Time</h6>
+    <div class="chart-wrap" style="height:300px;">
+      <canvas id="chartRevTime"></canvas>
+      <div class="chart-empty-overlay d-none" id="emptyRevTime">
+        <span class="text-muted">No data for selected filters</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── 5. County Breakdown + Type Distribution ── #}
+<div class="row g-3 mb-4">
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="card-title">Top Counties by Revenue</h6>
+        <div class="chart-wrap" style="height:340px;">
+          <canvas id="chartCounty"></canvas>
+          <div class="chart-empty-overlay d-none" id="emptyCounty">
+            <span class="text-muted">No data for selected filters</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5" id="typeDoughnutWrap">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="card-title">Surplus by Prospect Type</h6>
+        <div class="chart-wrap" style="height:340px;">
+          <canvas id="chartTypeDoughnut"></canvas>
+          <div class="chart-empty-overlay d-none" id="emptyTypeDoughnut">
+            <span class="text-muted">No data for selected filters</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── 6. SS Revenue by Type + Revenue by User ── #}
+<div class="row g-3 mb-4">
+  <div class="col-lg-5" id="typeBarWrap">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="card-title">SS Revenue by Type</h6>
+        <div class="chart-wrap" style="height:300px;">
+          <canvas id="chartTypeBar"></canvas>
+          <div class="chart-empty-overlay d-none" id="emptyTypeBar">
+            <span class="text-muted">No data for selected filters</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="card-title">Revenue by User</h6>
+        <div class="chart-wrap" style="height:300px;">
+          <canvas id="chartUser"></canvas>
+          <div class="chart-empty-overlay d-none" id="emptyUser">
+            <span class="text-muted">No data for selected filters</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── 7. Threshold Distribution ── #}
+<div class="row g-3 mb-4">
+  <div class="col-lg-6 mx-auto">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="card-title">Surplus Threshold Distribution</h6>
+        <div class="chart-wrap" style="height:300px;">
+          <canvas id="chartThreshold"></canvas>
+          <div class="chart-empty-overlay d-none" id="emptyThreshold">
+            <span class="text-muted">No data for selected filters</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── JSON data for initial load ── #}
+{{ kpi|json_script:"init-kpi" }}
+{{ revenue_over_time|json_script:"init-rev-time" }}
+{{ county_breakdown|json_script:"init-county" }}
+{{ type_distribution|json_script:"init-type" }}
+{{ user_revenue|json_script:"init-user" }}
+{{ threshold_distribution|json_script:"init-threshold" }}
+{{ filter_options|json_script:"init-filters" }}
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+  /* ── helpers ── */
+  const $ = s => document.querySelector(s);
+  const $$ = s => document.querySelectorAll(s);
+  const J = id => JSON.parse(document.getElementById(id).textContent || '{}');
+  const money = v => v == null ? '—' : '$' + Number(v).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+
+  /* ── colors ── */
+  const C = {
+    surplus:  'rgba(13,110,253,0.8)',
+    revenue:  'rgba(25,135,84,0.8)',
+    ars:      'rgba(255,193,7,0.8)',
+    benefit:  'rgba(13,202,240,0.8)',
+    pie: ['rgba(13,110,253,0.8)','rgba(25,135,84,0.8)','rgba(255,193,7,0.8)','rgba(220,53,69,0.8)','rgba(13,202,240,0.8)','rgba(111,66,193,0.8)'],
+  };
+
+  /* ── chart defaults ── */
+  const chartOpts = { responsive:true, maintainAspectRatio:false };
+  const moneyAxis = { ticks:{ callback: v => '$'+v.toLocaleString() }, beginAtZero:true };
+
+  /* ── state ── */
+  let mode = 'daily';
+  let startDate = new Date('{{ start_date }}');
+  let endDate = new Date('{{ end_date }}');
+  let selectedTypes = [];  // empty = all
+
+  /* ── init filter options ── */
+  const filterOpts = J('init-filters');
+
+  // States
+  const stateSelect = $('#filterState');
+  (filterOpts.states || []).forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.id; o.textContent = s.abbreviation + ' – ' + s.name;
+    stateSelect.appendChild(o);
+  });
+
+  // Type chips
+  const chipContainer = $('#typeChips');
+  (filterOpts.prospect_types || []).forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-sm btn-outline-secondary type-chip active';
+    btn.dataset.code = t.code;
+    btn.textContent = t.label;
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      rebuildSelectedTypes();
+      fetchAndUpdate();
+    });
+    chipContainer.appendChild(btn);
+  });
+
+  function rebuildSelectedTypes(){
+    const active = chipContainer.querySelectorAll('.type-chip.active');
+    const all = chipContainer.querySelectorAll('.type-chip');
+    if(active.length === all.length || active.length === 0){
+      selectedTypes = [];
+    } else {
+      selectedTypes = Array.from(active).map(b => b.dataset.code);
+    }
+  }
+
+  /* ── period helpers ── */
+  function today(){ return new Date(new Date().toISOString().slice(0,10)); }
+
+  function lastDayOfMonth(y, m){
+    return new Date(y, m + 1, 0).getDate();
+  }
+
+  function shiftPeriod(dir){
+    if(mode === 'daily'){
+      startDate = new Date(startDate.getTime() + dir*30*86400000);
+      endDate = new Date(endDate.getTime() + dir*30*86400000);
+    } else if(mode === 'monthly'){
+      // shift by one month
+      const newMonth = startDate.getMonth() + dir;
+      const y = startDate.getFullYear();
+      const d = new Date(y, newMonth, 1);
+      startDate = d;
+      endDate = new Date(d.getFullYear(), d.getMonth(), lastDayOfMonth(d.getFullYear(), d.getMonth()));
+    } else {
+      startDate.setFullYear(startDate.getFullYear() + dir*5);
+      endDate.setFullYear(endDate.getFullYear() + dir*5);
+    }
+    updatePeriodLabel();
+    fetchAndUpdate();
+  }
+
+  function setMode(m){
+    mode = m;
+    const t = today();
+    if(m === 'daily'){
+      endDate = t;
+      startDate = new Date(t.getTime() - 29*86400000);
+    } else if(m === 'monthly'){
+      // current month: 1st to last day
+      startDate = new Date(t.getFullYear(), t.getMonth(), 1);
+      endDate = new Date(t.getFullYear(), t.getMonth(), lastDayOfMonth(t.getFullYear(), t.getMonth()));
+    } else {
+      const y = t.getFullYear();
+      startDate = new Date(y-4, 0, 1);
+      endDate = new Date(y, 11, 31);
+    }
+    $$('#periodToggle .btn').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+    updatePeriodLabel();
+    fetchAndUpdate();
+  }
+
+  function fmtDate(d){ return d.toISOString().slice(0,10); }
+
+  function updatePeriodLabel(){
+    const el = $('#periodLabel');
+    el.textContent = fmtDate(startDate) + ' – ' + fmtDate(endDate);
+  }
+
+  /* ── charts init ── */
+  let chartRevTime, chartCounty, chartTypeDoughnut, chartTypeBar, chartUser, chartThreshold;
+
+  function initCharts(){
+    chartRevTime = new Chart($('#chartRevTime'), {
+      type:'line',
+      data:{ labels:[], datasets:[] },
+      options:{ ...chartOpts, scales:{ y: moneyAxis } }
+    });
+
+    chartCounty = new Chart($('#chartCounty'), {
+      type:'bar',
+      data:{ labels:[], datasets:[] },
+      options:{ ...chartOpts, indexAxis:'y', scales:{ x: moneyAxis } }
+    });
+
+    chartTypeDoughnut = new Chart($('#chartTypeDoughnut'), {
+      type:'doughnut',
+      data:{ labels:[], datasets:[] },
+      options:{ ...chartOpts, plugins:{ legend:{ position:'right' } } }
+    });
+
+    chartTypeBar = new Chart($('#chartTypeBar'), {
+      type:'bar',
+      data:{ labels:[], datasets:[] },
+      options:{ ...chartOpts, scales:{ y: moneyAxis } }
+    });
+
+    chartUser = new Chart($('#chartUser'), {
+      type:'bar',
+      data:{ labels:[], datasets:[] },
+      options:{ ...chartOpts, scales:{ y: moneyAxis } }
+    });
+
+    chartThreshold = new Chart($('#chartThreshold'), {
+      type:'pie',
+      data:{ labels:[], datasets:[] },
+      options:{ ...chartOpts, plugins:{ legend:{ position:'right' } } }
+    });
+  }
+
+  /* ── update functions ── */
+  function updateKPI(kpi){
+    $('#kpiTotalSurplus').textContent = money(kpi.total_surplus);
+    $('#kpiSSRevenue').textContent = money(kpi.ss_revenue);
+    $('#kpiARSPayout').textContent = money(kpi.ars_payout);
+    $('#kpiNetBenefit').textContent = money(kpi.ss_net_benefit);
+    $('#kpiAvgSurplus').textContent = money(kpi.avg_surplus);
+    $('#kpiProspectCount').textContent = kpi.prospect_count + ' prospects';
+  }
+
+  function toggleEmpty(overlayId, isEmpty){
+    const el = document.getElementById(overlayId);
+    if(el) el.classList.toggle('d-none', !isEmpty);
+  }
+
+  function updateRevTime(d){
+    const ds = d.datasets || {};
+    chartRevTime.data.labels = d.labels || [];
+    chartRevTime.data.datasets = [
+      { label:'Total Surplus', data: ds.total_surplus||[], borderColor: C.surplus, backgroundColor: C.surplus.replace('0.8','0.15'), fill:true, tension:.3 },
+      { label:'SS Revenue', data: ds.ss_revenue||[], borderColor: C.revenue, backgroundColor: C.revenue.replace('0.8','0.15'), fill:true, tension:.3 },
+      { label:'ARS Payout', data: ds.ars_payout||[], borderColor: C.ars, backgroundColor: C.ars.replace('0.8','0.15'), fill:true, tension:.3 },
+    ];
+    chartRevTime.update();
+    toggleEmpty('emptyRevTime', !(d.labels||[]).length);
+  }
+
+  function updateCounty(d){
+    chartCounty.data.labels = d.labels || [];
+    chartCounty.data.datasets = [
+      { label:'SS Revenue', data: d.ss_revenue||[], backgroundColor: C.revenue },
+      { label:'ARS Payout', data: d.ars_payout||[], backgroundColor: C.ars },
+    ];
+    chartCounty.update();
+    toggleEmpty('emptyCounty', !(d.labels||[]).length);
+  }
+
+  function updateTypeDoughnut(d){
+    chartTypeDoughnut.data.labels = d.labels || [];
+    chartTypeDoughnut.data.datasets = [{ data: d.surplus||[], backgroundColor: C.pie }];
+    chartTypeDoughnut.update();
+    toggleEmpty('emptyTypeDoughnut', !(d.labels||[]).length);
+  }
+
+  function updateTypeBar(d){
+    chartTypeBar.data.labels = d.labels || [];
+    chartTypeBar.data.datasets = [{ label:'SS Revenue', data: d.ss_revenue||[], backgroundColor: C.revenue }];
+    chartTypeBar.update();
+    toggleEmpty('emptyTypeBar', !(d.labels||[]).length);
+  }
+
+  function updateUser(d){
+    chartUser.data.labels = d.labels || [];
+    chartUser.data.datasets = [
+      { label:'Surplus', data: d.surplus||[], backgroundColor: C.surplus },
+      { label:'SS Revenue', data: d.ss_revenue||[], backgroundColor: C.revenue },
+      { label:'ARS Payout', data: d.ars_payout||[], backgroundColor: C.ars },
+      { label:'SS Benefit', data: d.ss_benefit||[], backgroundColor: C.benefit },
+    ];
+    chartUser.update();
+    toggleEmpty('emptyUser', !(d.labels||[]).length);
+  }
+
+  function updateThreshold(d){
+    chartThreshold.data.labels = d.labels || [];
+    chartThreshold.data.datasets = [{ data: d.counts||[], backgroundColor: C.pie }];
+    chartThreshold.update();
+    toggleEmpty('emptyThreshold', !((d.counts||[]).reduce((a,b)=>a+b,0)));
+  }
+
+  function updateAll(data){
+    updateKPI(data.kpi || {});
+    updateRevTime(data.revenue_over_time || {});
+    updateCounty(data.county_breakdown || {});
+    updateTypeDoughnut(data.type_distribution || {});
+    updateTypeBar(data.type_distribution || {});
+    updateUser(data.user_revenue || {});
+    updateThreshold(data.threshold_distribution || {});
+
+    // Hide type charts when single type filtered
+    const singleType = selectedTypes.length === 1;
+    $('#typeDoughnutWrap').style.display = singleType ? 'none' : '';
+    $('#typeBarWrap').style.display = singleType ? 'none' : '';
+  }
+
+  /* ── fetch ── */
+  function buildParams(){
+    const p = new URLSearchParams();
+    p.set('start', fmtDate(startDate));
+    p.set('end', fmtDate(endDate));
+    p.set('mode', mode);
+    const st = stateSelect.value;
+    if(st) p.set('state', st);
+    const co = $('#filterCounty').value;
+    if(co) p.set('county', co);
+    if(selectedTypes.length) p.set('prospect_type', selectedTypes.join(','));
+    const qs = $('#filterQualStatus').value;
+    if(qs) p.set('qualification_status', qs);
+    return p;
+  }
+
+  function fetchAndUpdate(){
+    fetch('/finance/api/data/?' + buildParams().toString())
+      .then(r => r.json())
+      .then(data => updateAll(data))
+      .catch(err => console.error('Finance API error:', err));
+  }
+
+  function fetchCounties(stateId){
+    const sel = $('#filterCounty');
+    sel.innerHTML = '<option value="">All Counties</option>';
+    if(!stateId) return;
+    fetch('/finance/api/counties/?state=' + stateId)
+      .then(r => r.json())
+      .then(data => {
+        (data.counties || []).forEach(c => {
+          const o = document.createElement('option');
+          o.value = c.id; o.textContent = c.name;
+          sel.appendChild(o);
+        });
+      });
+  }
+
+  /* ── event listeners ── */
+  $$('#periodToggle .btn').forEach(b => {
+    b.addEventListener('click', () => setMode(b.dataset.mode));
+  });
+  $('#navPrev').addEventListener('click', () => shiftPeriod(-1));
+  $('#navNext').addEventListener('click', () => shiftPeriod(1));
+
+  stateSelect.addEventListener('change', () => {
+    fetchCounties(stateSelect.value);
+    fetchAndUpdate();
+  });
+  $('#filterCounty').addEventListener('change', fetchAndUpdate);
+  $('#filterQualStatus').addEventListener('change', fetchAndUpdate);
+
+  /* ── init ── */
+  initCharts();
+  updatePeriodLabel();
+
+  // Load initial data from json_script
+  updateAll({
+    kpi: J('init-kpi'),
+    revenue_over_time: J('init-rev-time'),
+    county_breakdown: J('init-county'),
+    type_distribution: J('init-type'),
+    user_revenue: J('init-user'),
+    threshold_distribution: J('init-threshold'),
+  });
+})();
+</script>
+{% endblock %}

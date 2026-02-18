@@ -13,4 +13,7 @@ urlpatterns = [
     path("criteria/<int:pk>/delete/", views.CriteriaDeleteView.as_view(), name="criteria_delete"),
     path("criteria/<int:pk>/apply/", views.CriteriaApplyView.as_view(), name="criteria_apply"),
     path("prospects/upload-csv/", views.CSVUploadView.as_view(), name="prospect_csv_upload"),
+    path("prospects/uploads/", views.UploadListView.as_view(), name="prospect_upload_list"),
+    path("prospects/uploads/<int:pk>/prospects/", views.UploadProspectsListView.as_view(), name="prospect_upload_prospects"),
+    path("prospects/uploads/<int:pk>/apply-rule/", views.ApplyRuleToUploadView.as_view(), name="prospect_upload_apply_rule"),
 ]

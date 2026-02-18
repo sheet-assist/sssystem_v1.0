@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}CSV Uploads{% endblock %}
+
+{% block content %}
+<h2><i class="bi bi-upload"></i> CSV Uploads</h2>
+<div class="card mt-3">
+  <div class="card-body">
+    {% if uploads %}
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Uploaded By</th>
+            <th>State</th>
+            <th>County</th>
+            <th>Source</th>
+            <th class="text-end">Rows</th>
+            <th class="text-end">Created</th>
+            <th class="text-end">Skipped</th>
+            <th class="text-end">Errors</th>
+            <th>File</th>
+            <th>Apply Rule</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in uploads %}
+          <tr>
+            <td>{{ u.created_at|date:"m/d/Y H:i" }}</td>
+            <td>{% if u.uploaded_by %}{{ u.uploaded_by.get_full_name|default:u.uploaded_by.username }}{% else %}-{% endif %}</td>
+            <td>{% if u.state %}{{ u.state.name }} ({{ u.state.abbreviation }}){% else %}-{% endif %}</td>
+            <td>{% if u.county %}{{ u.county.name }}{% else %}-{% endif %}</td>
+            <td>{{ u.get_source_display }}</td>
+            <td class="text-end">{{ u.record_count }}</td>
+            <td class="text-end">{{ u.created_count }}</td>
+            <td class="text-end">{{ u.skipped_count }}</td>
+            <td class="text-end">{{ u.errors_count }}</td>
+            <td>
+              {% if u.file %}
+              <a href="{{ u.file.url }}" target="_blank" rel="noopener">Download</a>
+              {% else %}
+              -
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'settings_app:prospect_upload_prospects' u.pk %}" class="btn btn-sm btn-outline-primary">View prospects</a>
+            </td>
+            <td>
+              <form method="post" action="{% url 'settings_app:prospect_upload_apply_rule' u.pk %}" class="d-flex g-1">
+                {% csrf_token %}
+                <select name="rule" class="form-select form-select-sm me-2" style="min-width:200px;">
+                  <option value="">-- Choose rule --</option>
+                  {% for r in rules %}
+                    <option value="{{ r.pk }}">{{ r.name }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-outline-success">Apply</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="text-muted">No uploads recorded yet.</p>
+    {% endif %}
+
+    {% include "includes/pagination.html" with page_obj=uploads %}
+  </div>
+</div>
+{% endblock %}

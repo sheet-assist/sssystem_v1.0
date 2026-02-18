@@ -50,8 +50,8 @@
         </li>
         {% if user.profile.is_admin or user.is_superuser or user.profile.can_manage_finance_settings %}
         <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.app_name == 'settings_app' and request.resolver_match.url_name == 'finance' %}active{% endif %}"
-             href="{% url 'settings_app:finance' %}">
+          <a class="nav-link {% if request.resolver_match.app_name == 'finance' %}active{% endif %}"
+             href="{% url 'finance:dashboard' %}">
             <i class="bi bi-cash-stack"></i> Finances
           </a>
         </li>

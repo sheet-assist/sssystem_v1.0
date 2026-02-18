@@ -108,3 +108,83 @@ def apply_filter_rule(rule: FilterCriteria, acting_user: Optional[object] = None
             )
 
     return summary
+
+
+def apply_rule_to_queryset(rule: FilterCriteria, queryset, acting_user: Optional[object] = None) -> Dict[str, int]:
+    """Apply the given FilterCriteria rule to the provided Prospect queryset.
+
+    Returns the same summary dict structure as `apply_filter_rule`.
+    """
+    summary = {"processed": 0, "updated": 0, "qualified": 0, "disqualified": 0}
+    actor_label = (
+        acting_user.get_username()
+        if acting_user is not None and hasattr(acting_user, "get_username")
+        else "System"
+    )
+    applied_at = timezone.localtime(timezone.now())
+
+    with transaction.atomic():
+        for prospect in queryset.iterator(chunk_size=200):
+            summary["processed"] += 1
+            prospect_data = {
+                "prospect_type": prospect.prospect_type,
+                "plaintiff_max_bid": prospect.plaintiff_max_bid,
+                "assessed_value": prospect.assessed_value,
+                "final_judgment_amount": prospect.final_judgment_amount,
+                "sale_amount": prospect.sale_amount,
+                "surplus_amount": prospect.surplus_amount,
+                "auction_date": prospect.auction_date,
+                "auction_status": prospect.auction_status,
+                "sold_to": prospect.sold_to,
+            }
+            qualified, reasons = evaluate_rule_qualification(rule, prospect_data)
+            new_status = "qualified" if qualified else "disqualified"
+            note_text = (
+                f"Rule '{rule.name}' applied by {actor_label} at "
+                f"{applied_at:%Y-%m-%d %H:%M:%S %Z} marked this prospect as {new_status}."
+            )
+
+            if prospect.qualification_status == new_status:
+                add_rule_note(
+                    prospect,
+                    note=note_text,
+                    reasons=reasons if not qualified else None,
+                    created_by=acting_user,
+                    rule=rule,
+                    rule_name=rule.name,
+                    source="rule",
+                    decision=new_status,
+                )
+                continue
+
+            prospect.qualification_status = new_status
+            prospect.save(update_fields=["qualification_status", "updated_at"])
+            summary["updated"] += 1
+            summary[new_status] += 1
+
+            description = f"Rule '{rule.name}' applied to upload prospects."
+            if reasons:
+                description += f" Reasons: {'; '.join(reasons[:3])}"
+            log_prospect_action(
+                prospect,
+                acting_user,
+                new_status,
+                description=description,
+                metadata={
+                    "rule_id": rule.pk,
+                    "applied_via": "upload_apply",
+                },
+            )
+
+            add_rule_note(
+                prospect,
+                note=note_text,
+                reasons=reasons if not qualified else None,
+                created_by=acting_user,
+                rule=rule,
+                rule_name=rule.name,
+                source="rule",
+                decision=new_status,
+            )
+
+    return summary

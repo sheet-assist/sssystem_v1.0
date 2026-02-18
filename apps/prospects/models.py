@@ -41,6 +41,13 @@ class Prospect(models.Model):
         ("dead", "Dead"),
     ]
 
+    SOURCE_CHOICES = [
+        ("AC", "Auction Calendar"),
+        ("CU", "County Upload"),
+        ("CE", "County Emailed"),
+        ("EE", "Excess Elite"),
+    ]
+
     # Identity
     prospect_type = models.CharField(max_length=8, choices=PROSPECT_TYPES)
     auction_item_number = models.CharField(max_length=100, blank=True, default="")
@@ -106,6 +113,14 @@ class Prospect(models.Model):
 
     # Meta
     source_url = models.URLField(blank=True, default="")
+    source = models.CharField(max_length=4, choices=SOURCE_CHOICES, blank=True, default="")
+    uploaded_from = models.ForeignKey(
+        "CSVUploadLog",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="prospects",
+    )
     raw_data = models.JSONField(default=dict, blank=True)
     is_monitored = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -308,6 +323,29 @@ class ProspectDocumentNote(models.Model):
     def __str__(self):
         who = self.created_by.get_full_name() if self.created_by else "System"
         return f"Document note by {who} on {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class CSVUploadLog(models.Model):
+    """Record details about CSV uploads of prospects."""
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="prospect_csv_uploads")
+    state = models.ForeignKey("locations.State", on_delete=models.SET_NULL, null=True, blank=True)
+    county = models.ForeignKey("locations.County", on_delete=models.SET_NULL, null=True, blank=True)
+    source = models.CharField(max_length=8, choices=Prospect.SOURCE_CHOICES, blank=True, default="")
+    file = models.FileField(upload_to="prospect_uploads/%Y/%m/%d/", null=True, blank=True)
+    file_size = models.PositiveIntegerField(null=True, blank=True)
+    record_count = models.PositiveIntegerField(default=0)
+    created_count = models.PositiveIntegerField(default=0)
+    skipped_count = models.PositiveIntegerField(default=0)
+    errors_count = models.PositiveIntegerField(default=0)
+    errors = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        who = self.uploaded_by.get_full_name() if self.uploaded_by else "Unknown"
+        return f"CSV upload by {who} on {self.created_at:%Y-%m-%d %H:%M} ({self.record_count} rows)"
 
 def log_prospect_action(prospect, user, action_type, description="", metadata=None):
     """Utility to log a prospect action."""
