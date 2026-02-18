@@ -17,10 +17,24 @@ class UserProfile(models.Model):
         (ROLE_ADMIN, "Admin"),
     ]
 
+    ARS_TIER_CHOICES = [
+        (1, "1%"),
+        (3, "3%"),
+        (5, "5%"),
+        (7, "7%"),
+        (8, "8%"),
+        (9, "9%"),
+        (10, "10%"),
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     role = models.CharField(max_length=32, choices=ROLE_CHOICES, default=ROLE_PROSPECTS_ONLY)
     phone = models.CharField(max_length=32, blank=True, default="")
     can_manage_finance_settings = models.BooleanField(default=False)
+    ars_tier_percent = models.PositiveSmallIntegerField(
+        choices=ARS_TIER_CHOICES, default=5, 
+        help_text="User-specific ARS revenue tier percentage. Defaults to global setting if not set."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

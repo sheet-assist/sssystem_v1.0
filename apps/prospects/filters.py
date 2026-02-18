@@ -2,7 +2,25 @@ import django_filters
 from django import forms
 
 from apps.locations.models import County, State
+from apps.settings_app.models import SSRevenueSetting
 from .models import Prospect
+
+
+def get_surplus_threshold_choices():
+    """Generate surplus amount filter choices from SSRevenueSetting."""
+    setting = SSRevenueSetting.get_solo()
+
+    def _as_k_label(value):
+        numeric_value = int(value)
+        if numeric_value % 1000 == 0:
+            return f"{numeric_value // 1000}K"
+        return f"${numeric_value:,.0f}"
+
+    return [
+        ("1", f"Less than {_as_k_label(setting.surplus_threshold_1)}"),
+        ("2", f"Less than {_as_k_label(setting.surplus_threshold_2)}"),
+        ("3", f"Less than {_as_k_label(setting.surplus_threshold_3)}"),
+    ]
 
 
 class ProspectFilter(django_filters.FilterSet):
@@ -29,6 +47,13 @@ class ProspectFilter(django_filters.FilterSet):
         queryset=County.objects.filter(is_active=True).select_related("state").order_by("state__name", "name"),
         label="County",
         empty_label="All Counties",
+    )
+    surplus_amount_range = django_filters.ChoiceFilter(
+        field_name="surplus_amount",
+        method="filter_surplus_amount",
+        choices=get_surplus_threshold_choices,
+        label="Surplus Amount",
+        empty_label="All",
     )
     auction_date_from = django_filters.DateFilter(
         field_name="auction_date", lookup_expr="gte",
@@ -62,4 +87,19 @@ class ProspectFilter(django_filters.FilterSet):
             if hasattr(f, "field") and hasattr(f.field, "widget"):
                 widget = f.field.widget
                 if isinstance(widget, forms.Select):
-                    widget.attrs.setdefault("class", "form-select form-select-sm")
+                    widget.attrs.setdefault("class", "form-select form-select-sm")    
+    def filter_surplus_amount(self, queryset, name, value):
+        """Filter prospects by surplus amount ranges based on settings."""
+        if not value:
+            return queryset
+        
+        setting = SSRevenueSetting.get_solo()
+        
+        if value == "1":
+            return queryset.filter(surplus_amount__lt=setting.surplus_threshold_1)
+        elif value == "2":
+            return queryset.filter(surplus_amount__lt=setting.surplus_threshold_2)
+        elif value == "3":
+            return queryset.filter(surplus_amount__lt=setting.surplus_threshold_3)
+        
+        return queryset

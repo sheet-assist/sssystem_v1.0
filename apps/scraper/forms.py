@@ -3,9 +3,39 @@ from django.contrib.auth.models import User
 from datetime import date, timedelta
 
 from apps.locations.models import County, State
-
-from .models import ScrapeJob, ScrapingJob
+from .models import ScrapeJob, ScrapingJob, CountyScrapeURL
 from .services import JobDateService, UserDefaultsService
+
+
+# ============================================================================
+# CUSTOM FIELDS AND WIDGETS
+# ============================================================================
+
+class CountyWithURLChoiceField(forms.ModelMultipleChoiceField):
+    """Custom field to display county name with active URL if available"""
+    
+    def __init__(self, *args, job_type=None, **kwargs):
+        self.job_type = job_type
+        super().__init__(*args, **kwargs)
+    
+    def label_from_instance(self, obj):
+        """Display county name with active URL if available"""
+        label = obj.name
+        
+        # Try to get active URL for this county and job type
+        if self.job_type:
+            try:
+                url_obj = CountyScrapeURL.objects.get(
+                    county=obj,
+                    url_type=self.job_type,
+                    is_active=True
+                )
+                if url_obj.base_url:
+                    label = f"{obj.name} - {url_obj.base_url}"
+            except CountyScrapeURL.DoesNotExist:
+                pass
+        
+        return label
 
 
 # ============================================================================
@@ -303,7 +333,7 @@ class ScrapeJobForm(forms.ModelForm):
             "size": "12",
         }),
         label="Counties",
-        help_text="Choose one or more counties. Use Ctrl/Command + click for multi-select.",
+        help_text="County names show active URL if available. Use Ctrl/Command + click for multi-select.",
     )
     job_type = forms.ChoiceField(
         choices=ScrapeJob.JOB_TYPE,
@@ -329,6 +359,9 @@ class ScrapeJobForm(forms.ModelForm):
 
         # Always work with fresh queryset copies
         self.fields["state"].queryset = State.objects.filter(is_active=True).order_by("name")
+        
+        # Get the job_type to pass to counties field
+        job_type = self.data.get("job_type") or self.initial.get("job_type")
 
         state_value = self.data.get("state") or self.initial.get("state")
         state_obj = None
@@ -352,10 +385,24 @@ class ScrapeJobForm(forms.ModelForm):
             state_obj = self.instance.county.state
 
         if state_obj:
-            self.fields["counties"].queryset = County.objects.filter(
+            # Use custom field with job_type to display URLs
+            county_queryset = County.objects.filter(
                 is_active=True,
                 state=state_obj,
             ).order_by("name")
+            
+            # Replace the counties field with our custom field
+            self.fields["counties"] = CountyWithURLChoiceField(
+                queryset=county_queryset,
+                job_type=job_type,
+                widget=forms.SelectMultiple(attrs={
+                    "class": "form-select",
+                    "id": "id_counties",
+                    "size": "12",
+                }),
+                label="Counties",
+                help_text="County names show active URL if available. Use Ctrl/Command + click for multi-select.",
+            )
             
             # If editing, pre-populate the counties field with the current county
             if self.instance.pk and not self.data.get("counties"):
@@ -591,10 +638,44 @@ class CountyScrapeURLForm(forms.ModelForm):
         label="Notes"
     )
 
+    ac = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={
+            "class": "form-check-input",
+        }),
+        label="AC (Assessment Certificate) Enabled"
+    )
+
+    ac_url = forms.URLField(
+        required=False,
+        widget=forms.URLInput(attrs={
+            "class": "form-control",
+            "placeholder": "https://example.com/ac/...",
+        }),
+        label="AC URL"
+    )
+
+    tdm = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={
+            "class": "form-check-input",
+        }),
+        label="TDM (Tax Deed Market) Enabled"
+    )
+
+    tdm_url = forms.URLField(
+        required=False,
+        widget=forms.URLInput(attrs={
+            "class": "form-control",
+            "placeholder": "https://example.com/tdm/...",
+        }),
+        label="TDM URL"
+    )
+
     class Meta:
         from .models import CountyScrapeURL
         model = CountyScrapeURL
-        fields = ['state', 'county', 'url_type', 'base_url', 'is_active', 'notes']
+        fields = ['state', 'county', 'url_type', 'base_url', 'is_active', 'ac', 'ac_url', 'tdm', 'tdm_url', 'notes']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

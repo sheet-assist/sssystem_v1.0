@@ -1,10 +1,14 @@
 from django import forms
+from django.contrib.auth import get_user_model
 
+from apps.accounts.models import UserProfile
 from apps.locations.models import County
 from apps.prospects.models import Prospect
 
 from .models import FilterCriteria
 from .models import SSRevenueSetting
+
+User = get_user_model()
 
 
 class FilterCriteriaForm(forms.ModelForm):
@@ -155,6 +159,11 @@ class FilterCriteriaForm(forms.ModelForm):
         return cleaned
 
 
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+
 class SSRevenueTierForm(forms.Form):
     tier_percent = forms.ChoiceField(
         choices=SSRevenueSetting.TIER_CHOICES,
@@ -166,5 +175,70 @@ class SSRevenueTierForm(forms.Form):
         choices=SSRevenueSetting.ARS_TIER_CHOICES,
         widget=forms.RadioSelect,
         initial="5",
-        label="ARS Tiers Payout",
+        label="Global ARS Tiers Payout (Default)",
     )
+
+
+class UserARSTierForm(forms.Form):
+    user = forms.ModelChoiceField(
+        queryset=User.objects.all(),
+        label="Select User",
+        required=True,
+        widget=forms.HiddenInput(),
+    )
+    ars_tier_percent = forms.ChoiceField(
+        choices=UserProfile.ARS_TIER_CHOICES,
+        widget=forms.RadioSelect,
+        required=True,
+        label="User-Specific ARS Tier",
+    )
+
+
+class SurplusThresholdForm(forms.Form):
+    surplus_threshold_1 = forms.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=0,
+        label="Threshold 1 (Less than $X)",
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "step": "1000",
+            "placeholder": "e.g., 50000 for $50,000"
+        }),
+    )
+    surplus_threshold_2 = forms.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=0,
+        label="Threshold 2 (Less than $X)",
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "step": "1000",
+            "placeholder": "e.g., 100000 for $100,000"
+        }),
+    )
+    surplus_threshold_3 = forms.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=0,
+        label="Threshold 3 (Less than $X)",
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "step": "1000",
+            "placeholder": "e.g., 150000 for $150,000"
+        }),
+    )
+    
+    def clean(self):
+        cleaned = super().clean()
+        t1 = cleaned.get('surplus_threshold_1')
+        t2 = cleaned.get('surplus_threshold_2')
+        t3 = cleaned.get('surplus_threshold_3')
+        
+        # Ensure thresholds are in ascending order
+        if t1 and t2 and t2 <= t1:
+            raise forms.ValidationError("Threshold 2 must be greater than Threshold 1.")
+        if t2 and t3 and t3 <= t2:
+            raise forms.ValidationError("Threshold 3 must be greater than Threshold 2.")
+        
+        return cleaned

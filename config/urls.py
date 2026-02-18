@@ -14,5 +14,5 @@ urlpatterns = [
     path("cases/", include("apps.cases.urls")),
     path("scraper/", include("apps.scraper.urls")),
     path("settings/", include("apps.settings_app.urls")),
-    path("locations/", include("apps.locations.urls")),
+    path("locations/", include(("apps.locations.urls", "locations"))),
 ]

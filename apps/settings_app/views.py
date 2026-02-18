@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views import View
@@ -9,7 +10,7 @@ from apps.accounts.mixins import AdminRequiredMixin
 from apps.prospects.forms import CSVUploadForm
 from apps.prospects.services.csv_import import import_prospects_from_csv
 
-from .forms import FilterCriteriaForm, SSRevenueTierForm
+from .forms import FilterCriteriaForm, SSRevenueTierForm, UserARSTierForm, SurplusThresholdForm
 from .models import FilterCriteria, SSRevenueSetting
 from .services import apply_filter_rule
 
@@ -104,6 +105,8 @@ class FinanceSettingsView(FinanceSettingsAccessMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        User = get_user_model()
+        
         setting = SSRevenueSetting.get_solo()
         ctx["current_tier"] = setting.tier_percent
         ctx["current_ars_tier"] = setting.ars_tier_percent
@@ -117,32 +120,102 @@ class FinanceSettingsView(FinanceSettingsAccessMixin, TemplateView):
         ctx["ars_tier_choices"] = SSRevenueSetting.ARS_TIER_CHOICES
         ctx["selected_tier"] = str(setting.tier_percent)
         ctx["selected_ars_tier"] = str(setting.ars_tier_percent)
+        
+        # Surplus threshold form
+        ctx["surplus_threshold_form"] = SurplusThresholdForm(
+            initial={
+                "surplus_threshold_1": setting.surplus_threshold_1,
+                "surplus_threshold_2": setting.surplus_threshold_2,
+                "surplus_threshold_3": setting.surplus_threshold_3,
+            }
+        )
+        ctx["surplus_thresholds"] = {
+            "threshold_1": setting.surplus_threshold_1,
+            "threshold_2": setting.surplus_threshold_2,
+            "threshold_3": setting.surplus_threshold_3,
+        }
+        
+        # User-specific ARS tiers
+        ctx["user_ars_form"] = UserARSTierForm()
+        users_with_tiers = User.objects.filter(
+            profile__isnull=False
+        ).select_related('profile').order_by('first_name', 'last_name')
+        ctx["users_with_tiers"] = [
+            {
+                "user": user,
+                "username": user.username,
+                "full_name": f"{user.first_name} {user.last_name}".strip() or user.username,
+                "ars_tier": user.profile.ars_tier_percent,
+            }
+            for user in users_with_tiers
+        ]
         return ctx
 
     def post(self, request, *args, **kwargs):
-        form = SSRevenueTierForm(request.POST)
-        if not form.is_valid():
-            ctx = self.get_context_data(**kwargs)
-            ctx["form"] = form
-            ctx["tier_choices"] = SSRevenueSetting.TIER_CHOICES
-            ctx["ars_tier_choices"] = SSRevenueSetting.ARS_TIER_CHOICES
-            ctx["selected_tier"] = request.POST.get("tier_percent", "15")
-            ctx["selected_ars_tier"] = request.POST.get("ars_tier_percent", "5")
-            return self.render_to_response(ctx)
+        # Handle global tier settings
+        if "tier_percent" in request.POST:
+            form = SSRevenueTierForm(request.POST)
+            if not form.is_valid():
+                ctx = self.get_context_data(**kwargs)
+                ctx["form"] = form
+                ctx["tier_choices"] = SSRevenueSetting.TIER_CHOICES
+                ctx["ars_tier_choices"] = SSRevenueSetting.ARS_TIER_CHOICES
+                ctx["selected_tier"] = request.POST.get("tier_percent", "15")
+                ctx["selected_ars_tier"] = request.POST.get("ars_tier_percent", "5")
+                return self.render_to_response(ctx)
 
-        setting = SSRevenueSetting.get_solo()
-        setting.tier_percent = int(form.cleaned_data["tier_percent"])
-        setting.ars_tier_percent = int(form.cleaned_data["ars_tier_percent"])
-        setting.updated_by = request.user
-        setting.save(update_fields=["tier_percent", "ars_tier_percent", "updated_by", "updated_at"])
-        messages.success(
-            request,
-            (
-                f"SS Revenue Tier updated to {setting.tier_percent}% "
-                f"and ARS Tier updated to {setting.ars_tier_percent}%."
-            ),
-        )
-        return redirect("settings_app:finance")
+            setting = SSRevenueSetting.get_solo()
+            setting.tier_percent = int(form.cleaned_data["tier_percent"])
+            setting.ars_tier_percent = int(form.cleaned_data["ars_tier_percent"])
+            setting.updated_by = request.user
+            setting.save(update_fields=["tier_percent", "ars_tier_percent", "updated_by", "updated_at"])
+            messages.success(
+                request,
+                (
+                    f"SS Revenue Tier updated to {setting.tier_percent}% "
+                    f"and ARS Tier updated to {setting.ars_tier_percent}%."
+                ),
+            )
+            return redirect("settings_app:finance")
+        
+        # Handle user-specific ARS tier settings
+        elif "user" in request.POST:
+            form = UserARSTierForm(request.POST)
+            if form.is_valid():
+                user = form.cleaned_data["user"]
+                ars_tier = int(form.cleaned_data["ars_tier_percent"])
+                user.profile.ars_tier_percent = ars_tier
+                user.profile.save(update_fields=["ars_tier_percent"])
+                messages.success(
+                    request,
+                    f"ARS Tier for {user.get_full_name() or user.username} updated to {ars_tier}%."
+                )
+            else:
+                # Show form errors
+                error_msg = " ".join([str(e) for errors in form.errors.values() for e in errors])
+                messages.error(request, f"Error updating user ARS tier: {error_msg}")
+            return redirect("settings_app:finance")
+        
+        # Handle surplus threshold settings
+        elif "surplus_threshold_1" in request.POST:
+            form = SurplusThresholdForm(request.POST)
+            if form.is_valid():
+                setting = SSRevenueSetting.get_solo()
+                setting.surplus_threshold_1 = form.cleaned_data["surplus_threshold_1"]
+                setting.surplus_threshold_2 = form.cleaned_data["surplus_threshold_2"]
+                setting.surplus_threshold_3 = form.cleaned_data["surplus_threshold_3"]
+                setting.updated_by = request.user
+                setting.save(update_fields=["surplus_threshold_1", "surplus_threshold_2", "surplus_threshold_3", "updated_by", "updated_at"])
+                messages.success(
+                    request,
+                    f"Surplus filter thresholds updated to ${setting.surplus_threshold_1:,.0f}, "
+                    f"${setting.surplus_threshold_2:,.0f}, and ${setting.surplus_threshold_3:,.0f}."
+                )
+            else:
+                # Show form errors
+                error_msg = " ".join([str(e) for errors in form.errors.values() for e in errors])
+                messages.error(request, f"Error updating surplus thresholds: {error_msg}")
+            return redirect("settings_app:finance")
 
 
 class CSVUploadView(AdminRequiredMixin, TemplateView):

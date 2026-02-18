@@ -131,9 +131,9 @@
 
         <div class="card-footer bg-light p-2">
           <div class="d-flex gap-1">
-            <form method="post" action="{% url 'settings_app:criteria_apply' rule.pk %}" class="d-inline flex-grow-1">
+            <form method="post" action="{% url 'settings_app:criteria_apply' rule.pk %}" class="d-inline flex-grow-1 js-apply-rule-form">
               {% csrf_token %}
-              <button type="submit" class="btn btn-success btn-sm w-100" style="font-size: 0.85rem; padding: 0.25rem 0.5rem;">
+              <button type="submit" class="btn btn-success btn-sm w-100 js-apply-rule-btn" style="font-size: 0.85rem; padding: 0.25rem 0.5rem;">
                 <i class="bi bi-play-fill"></i> Apply Now
               </button>
             </form>
@@ -150,6 +150,11 @@
           <small class="text-muted d-block mt-2">
             Updated: {{ rule.updated_at|date:"M d, Y" }}
           </small>
+          <div class="progress mt-2 d-none js-apply-progress" role="status" aria-live="polite">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success js-apply-progress-bar" style="width: 0%;">
+               <span class="js-apply-progress-value">0%</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -203,6 +208,38 @@
         const isHidden = panel.classList.contains('d-none');
         panel.classList.toggle('d-none', !isHidden);
         btn.textContent = isHidden ? btn.getAttribute('data-hide-text') : btn.getAttribute('data-show-text');
+      });
+    });
+
+    const applyForms = document.querySelectorAll('.js-apply-rule-form');
+    applyForms.forEach(function (form) {
+      form.addEventListener('submit', function () {
+        const btn = form.querySelector('.js-apply-rule-btn');
+        const footer = form.closest('.card-footer');
+        const progress = footer ? footer.querySelector('.js-apply-progress') : null;
+        const progressBar = footer ? footer.querySelector('.js-apply-progress-bar') : null;
+        const progressValue = footer ? footer.querySelector('.js-apply-progress-value') : null;
+
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Applying...';
+        }
+        if (progress) {
+          progress.classList.remove('d-none');
+        }
+        if (progressBar && progressValue) {
+          let pct = 0;
+          progressBar.style.width = '0%';
+          progressValue.textContent = '0%';
+          const timer = setInterval(function () {
+            pct = Math.min(95, pct + Math.floor(Math.random() * 4) + 1);
+            progressBar.style.width = pct + '%';
+            progressValue.textContent = pct + '%';
+            if (pct >= 95) {
+              clearInterval(timer);
+            }
+          }, 120);
+        }
       });
     });
   })();

@@ -6,7 +6,7 @@ from xml.sax.saxutils import escape
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
-from django.db.models import Count, Q, Min, Max, Sum, F, Value, ExpressionWrapper, DecimalField
+from django.db.models import Count, Q, Min, Max, Sum, F, Value, ExpressionWrapper, DecimalField, Case, When
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -133,6 +133,30 @@ def _annotate_revenue(qs, tier_percent):
         )
     )
 
+
+def _annotate_ars_calculations(qs):
+    """Annotate ARS tier, ARS amount, and SS benefit for each prospect."""
+    from django.db import models as db_models
+    
+    # Get global ARS tier as fallback
+    global_ars_tier = SSRevenueSetting.get_solo().ars_tier_percent
+    
+    return qs.annotate(
+        ars_tier_percent=Case(
+            When(assigned_to__isnull=False, then=F("assigned_to__profile__ars_tier_percent")),
+            default=Value(global_ars_tier),
+            output_field=db_models.IntegerField(),
+        ),
+        ars_amount=ExpressionWrapper(
+            (F("ss_revenue_amount") * F("ars_tier_percent")) / Value(100),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        ),
+        ss_benefit=ExpressionWrapper(
+            F("ss_revenue_amount") - F("ars_amount"),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        )
+    )
+
 class TypeSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, TemplateView):
     template_name = "prospects/type_select.html"
     export_filename_prefix = "prospects_type"
@@ -149,7 +173,7 @@ class TypeSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, TemplateVie
                 qualified_count=Count("id", filter=Q(qualification_status="qualified")),
                 first_auction=Min("auction_date"),
                 last_auction=Max("auction_date"),
-                total_surplus=Sum("surplus_amount"),
+                total_surplus=Sum("surplus_amount", filter=Q(qualification_status="qualified")),
             )
         }
         ctx["type_cards"] = [
@@ -170,7 +194,7 @@ class TypeSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, TemplateVie
         if selected_type not in type_codes:
             selected_type = ""
 
-        prospect_qs = Prospect.objects.select_related("county", "county__state", "assigned_to")
+        prospect_qs = Prospect.objects.select_related("county", "county__state", "assigned_to", "assigned_to__profile")
         if selected_type:
             prospect_qs = prospect_qs.filter(prospect_type=selected_type)
 
@@ -181,6 +205,7 @@ class TypeSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, TemplateVie
         filtered_qs = prospect_filter.qs
         if can_view_revenue:
             filtered_qs = _annotate_revenue(filtered_qs, ss_revenue_tier)
+            filtered_qs = _annotate_ars_calculations(filtered_qs)
         filtered_prospects = filtered_qs.order_by(
             F("auction_date").asc(nulls_last=True),
             "created_at",
@@ -188,7 +213,7 @@ class TypeSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, TemplateVie
         paginator = Paginator(filtered_prospects, 25)
         page_obj = paginator.get_page(self.request.GET.get("page"))
         has_active_filters = any(k != "page" and bool(v) for k, v in self.request.GET.items())
-        filtered_surplus = prospect_filter.qs.aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
+        filtered_surplus = prospect_filter.qs.filter(qualification_status="qualified").aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
 
         ctx["selected_prospect_type"] = selected_type
         ctx["filter"] = prospect_filter
@@ -235,7 +260,10 @@ class StateSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, ListView):
             ),
             total_surplus=Sum(
                 "counties__prospects__surplus_amount",
-                filter=Q(counties__prospects__prospect_type=self.kwargs["prospect_type"]),
+                filter=Q(
+                    counties__prospects__prospect_type=self.kwargs["prospect_type"],
+                    counties__prospects__qualification_status="qualified",
+                ),
             ),
         )
         qs = qs.filter(total_count__gt=0)
@@ -263,6 +291,7 @@ class StateSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, ListView):
         filtered_qs = prospect_filter.qs
         if can_view_revenue:
             filtered_qs = _annotate_revenue(filtered_qs, ss_revenue_tier)
+            filtered_qs = _annotate_ars_calculations(filtered_qs)
         filtered_prospects = filtered_qs.order_by(
             F("auction_date").asc(nulls_last=True),
             "created_at",
@@ -270,7 +299,7 @@ class StateSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, ListView):
         paginator = Paginator(filtered_prospects, 25)
         page_obj = paginator.get_page(self.request.GET.get("page"))
         has_active_filters = any(k != "page" and bool(v) for k, v in self.request.GET.items())
-        filtered_surplus = prospect_filter.qs.aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
+        filtered_surplus = prospect_filter.qs.filter(qualification_status="qualified").aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
 
         ctx["filter"] = prospect_filter
         ctx["prospect_list"] = page_obj.object_list
@@ -349,6 +378,7 @@ class CountySelectView(ProspectsAccessMixin, ProspectExcelExportMixin, ListView)
         filtered_qs = prospect_filter.qs
         if can_view_revenue:
             filtered_qs = _annotate_revenue(filtered_qs, ss_revenue_tier)
+            filtered_qs = _annotate_ars_calculations(filtered_qs)
         filtered_prospects = filtered_qs.order_by(
             F("auction_date").asc(nulls_last=True),
             "created_at",
@@ -356,7 +386,7 @@ class CountySelectView(ProspectsAccessMixin, ProspectExcelExportMixin, ListView)
         paginator = Paginator(filtered_prospects, 25)
         page_obj = paginator.get_page(self.request.GET.get("page"))
         has_active_filters = any(k != "page" and bool(v) for k, v in self.request.GET.items())
-        filtered_surplus = prospect_filter.qs.aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
+        filtered_surplus = prospect_filter.qs.filter(qualification_status="qualified").aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
 
         ctx["filter"] = prospect_filter
         ctx["prospect_list"] = page_obj.object_list
@@ -446,7 +476,7 @@ class ProspectListView(ProspectsAccessMixin, ProspectExcelExportMixin, FilterVie
 
         ctx["stats_total"] = filtered_qs.count()
         ctx["stats_qualified"] = filtered_qs.filter(qualification_status="qualified").count()
-        ctx["stats_surplus_sum"] = filtered_qs.aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
+        ctx["stats_surplus_sum"] = filtered_qs.filter(qualification_status="qualified").aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
 
         # first / last auction dates (based on active filters)
         agg_dates = filtered_qs.aggregate(first_auction=Min("auction_date"), last_auction=Max("auction_date"))

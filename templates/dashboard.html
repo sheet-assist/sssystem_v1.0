@@ -263,8 +263,31 @@
       if (window.dailyQualifiedChart && typeof window.dailyQualifiedChart.destroy === "function") {
         window.dailyQualifiedChart.destroy();
       }
+      const qualifiedBarLabelPlugin = {
+        id: "qualifiedBarLabelPlugin",
+        afterDatasetsDraw(chart) {
+          const ctx = chart.ctx;
+          const qualifiedMeta = chart.getDatasetMeta(0);
+          const qualifiedDataset = chart.data.datasets[0];
+          if (!qualifiedMeta || !qualifiedDataset) return;
+
+          ctx.save();
+          ctx.fillStyle = "#146c43";
+          ctx.font = "11px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "bottom";
+
+          qualifiedMeta.data.forEach((bar, index) => {
+            const value = qualifiedDataset.data?.[index];
+            if (value === null || value === undefined) return;
+            ctx.fillText(String(value), bar.x, bar.y - 4);
+          });
+          ctx.restore();
+        },
+      };
       window.dailyQualifiedChart = new Chart(dailyChartEl, {
         type: "bar",
+        plugins: [qualifiedBarLabelPlugin],
         data: {
           labels: dailyData.labels || [],
           datasets: [{

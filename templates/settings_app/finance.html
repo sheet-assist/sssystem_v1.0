@@ -68,16 +68,181 @@
 
         <div class="mt-4">
           <button type="submit" class="btn btn-primary btn-sm">
-            <i class="bi bi-check2-circle me-1"></i> Save Tiers
+            <i class="bi bi-check2-circle me-1"></i> Save Global Tiers
           </button>
-          {% if user.profile.is_admin or user.is_superuser %}
-          <a href="{% url 'settings_app:home' %}" class="btn btn-outline-secondary btn-sm ms-1">Back</a>
-          {% else %}
-          <a href="{% url 'dashboard:home' %}" class="btn btn-outline-secondary btn-sm ms-1">Back</a>
-          {% endif %}
         </div>
       </form>
     </div>
   </div>
+
+  <div class="card mt-4">
+    <div class="card-body">
+      <h5 class="card-title">Type Select Surplus Filters</h5>
+      <p class="text-muted mb-3">Set the three "Less than" surplus options shown on Prospects Type Select.</p>
+
+      <form method="post">
+        {% csrf_token %}
+        {% if surplus_threshold_form.non_field_errors %}
+        <div class="alert alert-danger py-2">
+          {% for error in surplus_threshold_form.non_field_errors %}
+          <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="row g-3">
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="{{ surplus_threshold_form.surplus_threshold_1.id_for_label }}">
+              {{ surplus_threshold_form.surplus_threshold_1.label }}
+            </label>
+            {{ surplus_threshold_form.surplus_threshold_1 }}
+            {% if surplus_threshold_form.surplus_threshold_1.errors %}
+            <div class="text-danger small mt-1">{{ surplus_threshold_form.surplus_threshold_1.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="{{ surplus_threshold_form.surplus_threshold_2.id_for_label }}">
+              {{ surplus_threshold_form.surplus_threshold_2.label }}
+            </label>
+            {{ surplus_threshold_form.surplus_threshold_2 }}
+            {% if surplus_threshold_form.surplus_threshold_2.errors %}
+            <div class="text-danger small mt-1">{{ surplus_threshold_form.surplus_threshold_2.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="{{ surplus_threshold_form.surplus_threshold_3.id_for_label }}">
+              {{ surplus_threshold_form.surplus_threshold_3.label }}
+            </label>
+            {{ surplus_threshold_form.surplus_threshold_3 }}
+            {% if surplus_threshold_form.surplus_threshold_3.errors %}
+            <div class="text-danger small mt-1">{{ surplus_threshold_form.surplus_threshold_3.errors.0 }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-check2-circle me-1"></i> Save Surplus Thresholds
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- User-Specific ARS Tiers Section -->
+  <div class="card mt-4">
+    <div class="card-body">
+      <h5 class="card-title">User-Specific ARS Tier Settings</h5>
+      <p class="text-muted mb-3">Assign custom ARS revenue tiers to individual users. Leave empty to use the global default.</p>
+
+      <!-- Users List with Current ARS Tiers and Inline Editing -->
+      <div class="table-responsive">
+        <table class="table table-sm table-hover">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Username</th>
+              <th>Current ARS Tier</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in users_with_tiers %}
+            <tr>
+              <td>{{ item.full_name }}</td>
+              <td>{{ item.username }}</td>
+              <td>
+                <span class="badge bg-info">{{ item.ars_tier }}%</span>
+              </td>
+              <td>
+                <button 
+                  type="button" 
+                  class="btn btn-sm btn-outline-primary"
+                  data-bs-toggle="modal"
+                  data-bs-target="#tierModal"
+                  onclick="setUserModal({{ item.user.id }}, '{{ item.full_name }}', {{ item.ars_tier }})"
+                >
+                  <i class="bi bi-pencil"></i> Edit
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="text-center text-muted">No users found</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <hr class="my-4">
+      <p class="text-muted small">
+        <i class="bi bi-info-circle me-1"></i>
+        <strong>Note:</strong> If a user doesn't have a specific ARS tier assigned, the global ARS tier ({{ current_ars_tier }}%) will be used as default.
+      </p>
+    </div>
+  </div>
+
+  <!-- Modal for editing user ARS tier -->
+  <div class="modal fade" id="tierModal" tabindex="-1" aria-labelledby="tierModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="tierModalLabel">Set ARS Tier for <span id="modalUserName"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form method="post" id="userTierForm">
+          {% csrf_token %}
+          <div class="modal-body">
+            <input type="hidden" name="user" id="modalUserId" value="">
+            <label class="form-label">Select ARS Tier Percentage:</label>
+            <div class="btn-group flex-wrap gap-2" role="group" aria-label="User ARS Tier Options">
+              {% for value, label in ars_tier_choices %}
+              <input
+                type="radio"
+                class="btn-check"
+                name="ars_tier_percent"
+                id="id_modal_ars_tier_{{ forloop.counter0 }}"
+                value="{{ value }}"
+                autocomplete="off"
+              >
+              <label class="btn btn-outline-info btn-sm" for="id_modal_ars_tier_{{ forloop.counter0 }}">{{ label }}</label>
+              {% endfor %}
+            </div>
+            {% if form.ars_tier_percent.errors %}
+            <div class="text-danger small mt-2">{{ form.ars_tier_percent.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-check2-circle me-1"></i> Save ARS Tier
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-3">
+    {% if user.profile.is_admin or user.is_superuser %}
+    <a href="{% url 'settings_app:home' %}" class="btn btn-outline-secondary btn-sm">Back</a>
+    {% else %}
+    <a href="{% url 'dashboard:home' %}" class="btn btn-outline-secondary btn-sm">Back</a>
+    {% endif %}
+  </div>
 </div>
+
+<script>
+function setUserModal(userId, userName, currentTier) {
+  document.getElementById('modalUserId').value = userId;
+  document.getElementById('modalUserName').textContent = userName;
+  
+  // Reset all tier selections and select the current one
+  document.querySelectorAll('input[name="ars_tier_percent"]').forEach(input => {
+    input.checked = (parseInt(input.value) === currentTier);
+  });
+}
+</script>
+
 {% endblock %}

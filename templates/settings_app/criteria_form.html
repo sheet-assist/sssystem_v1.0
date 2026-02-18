@@ -29,10 +29,9 @@
   </div>
   <div class="d-flex gap-2 align-items-center">
     {% if form.instance.pk %}
-    <form method="post" action="{% url 'settings_app:criteria_apply' form.instance.pk %}" class="d-inline"
-      onsubmit="return confirm('Apply this rule to all matching prospects now? This may take a moment.');">
+    <form method="post" action="{% url 'settings_app:criteria_apply' form.instance.pk %}" class="d-inline js-apply-rule-form">
       {% csrf_token %}
-      <button type="submit" class="btn btn-warning btn-sm">
+      <button type="submit" class="btn btn-warning btn-sm js-apply-rule-btn">
         <i class="bi bi-lightning-charge me-1"></i>Apply Now
       </button>
     </form>
@@ -42,6 +41,13 @@
     </a>
   </div>
 </div>
+{% if form.instance.pk %}
+<div class="progress mt-2 d-none js-apply-progress" role="status" aria-live="polite">
+  <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning text-dark js-apply-progress-bar" style="width: 0%;">
+     <span class="js-apply-progress-value">0%</span>
+  </div>
+</div>
+{% endif %}
 
 <form method="post" class="mt-4">
   {% csrf_token %}
@@ -254,6 +260,41 @@
         }
       });
     });
+
+    const applyForm = document.querySelector('.js-apply-rule-form');
+    if (applyForm) {
+      applyForm.addEventListener('submit', (event) => {
+        const confirmed = window.confirm('Apply this rule to all matching prospects now? This may take a moment.');
+        if (!confirmed) {
+          event.preventDefault();
+          return;
+        }
+        const btn = applyForm.querySelector('.js-apply-rule-btn');
+        const progress = document.querySelector('.js-apply-progress');
+        const progressBar = document.querySelector('.js-apply-progress-bar');
+        const progressValue = document.querySelector('.js-apply-progress-value');
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Applying...';
+        }
+        if (progress) {
+          progress.classList.remove('d-none');
+        }
+        if (progressBar && progressValue) {
+          let pct = 0;
+          progressBar.style.width = '0%';
+          progressValue.textContent = '0%';
+          const timer = setInterval(() => {
+            pct = Math.min(95, pct + Math.floor(Math.random() * 4) + 1);
+            progressBar.style.width = pct + '%';
+            progressValue.textContent = `${pct}%`;
+            if (pct >= 95) {
+              clearInterval(timer);
+            }
+          }, 120);
+        }
+      });
+    }
   })();
 </script>
 {% endblock %}

@@ -190,6 +190,21 @@ class SSRevenueSetting(models.Model):
         (10, "10%"),
     ]
     ars_tier_percent = models.PositiveSmallIntegerField(choices=ARS_TIER_CHOICES, default=5)
+    
+    # Surplus Amount Filter Thresholds (in dollars)
+    surplus_threshold_1 = models.DecimalField(
+        max_digits=12, decimal_places=2, default=50000,
+        help_text="First surplus threshold (e.g., Less than $50,000)"
+    )
+    surplus_threshold_2 = models.DecimalField(
+        max_digits=12, decimal_places=2, default=100000,
+        help_text="Second surplus threshold (e.g., Less than $100,000)"
+    )
+    surplus_threshold_3 = models.DecimalField(
+        max_digits=12, decimal_places=2, default=150000,
+        help_text="Third surplus threshold (e.g., Less than $150,000)"
+    )
+    
     updated_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="updated_ss_revenue_settings"
     )
