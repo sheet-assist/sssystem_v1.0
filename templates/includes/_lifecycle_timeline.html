@@ -1,0 +1,71 @@
+<style>
+  .lc-wrap { display: flex; flex-direction: column; gap: .25rem; }
+  .lc-trigger {
+    display: flex; align-items: center; gap: .45rem;
+    width: 100%; background: none; border: none;
+    padding: .3rem .35rem; border-radius: .35rem;
+    cursor: pointer; text-align: left; transition: background .15s;
+  }
+  .lc-trigger:hover { background: rgba(0,0,0,.05); }
+  .lc-dot {
+    flex-shrink: 0; width: 1.5rem; height: 1.5rem; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .65rem; color: #fff;
+  }
+  .lc-summary { flex: 1; min-width: 0; }
+  .lc-label { display: block; font-size: .75rem; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lc-date  { display: block; font-size: .68rem; color: #6c757d; }
+  .lc-chevron { flex-shrink: 0; font-size: .6rem; color: #adb5bd; transition: transform .2s; }
+  .lc-trigger[aria-expanded="true"] .lc-chevron { transform: rotate(180deg); }
+  .lc-details {
+    margin-left: 1.95rem; margin-top: .15rem;
+    padding: .35rem .5rem; border-radius: .3rem;
+    background: #f8f9fa; border-left: 2px solid #dee2e6;
+    font-size: .75rem;
+  }
+  .lc-phase-case .lc-details { border-left-color: #198754; }
+  .lc-details p { margin-bottom: .2rem; }
+  .bg-purple { background-color: #6f42c1 !important; }
+  /* connecting line */
+  .lc-item { position: relative; }
+  .lc-item:not(:last-child)::after {
+    content: ''; position: absolute;
+    left: .98rem; top: 1.8rem; bottom: -.25rem;
+    width: 2px; background: #dee2e6; z-index: 0;
+  }
+</style>
+
+{% if timeline %}
+<div class="lc-wrap">
+  {% for ev in timeline reversed %}
+  <div class="lc-item lc-phase-{{ ev.phase }}">
+    <button
+      class="lc-trigger"
+      type="button"
+      data-bs-toggle="collapse"
+      data-bs-target="#lcev{{ forloop.counter }}"
+      aria-expanded="false"
+      aria-controls="lcev{{ forloop.counter }}"
+    >
+      <span class="lc-dot bg-{{ ev.color }}">
+        <i class="bi {{ ev.icon }}"></i>
+      </span>
+      <span class="lc-summary">
+        <span class="lc-label" title="{{ ev.label }}">{{ ev.label }}</span>
+        <span class="lc-date">{{ ev.date|date:"M d, Y" }}</span>
+      </span>
+      <i class="bi bi-chevron-down lc-chevron"></i>
+    </button>
+    <div class="collapse" id="lcev{{ forloop.counter }}">
+      <div class="lc-details">
+        <div class="text-muted mb-1" style="font-size:.68rem;">{{ ev.date|date:"M d, Y H:i" }}</div>
+        {% if ev.description %}<p class="text-secondary">{{ ev.description }}</p>{% endif %}
+        <span class="fst-italic text-muted">{{ ev.actor }}</span>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="text-muted small mb-0">No events recorded yet.</p>
+{% endif %}

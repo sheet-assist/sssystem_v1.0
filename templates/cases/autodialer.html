@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Autodialer - Case {{ object.case_number }}{% endblock %}
+
+{% block content %}
+<h2>Autodialer for Case {{ object.case_number }}</h2>
+<p class="text-muted">Placeholder for case autodialer integration.</p>
+<div class="card"><div class="card-body">
+  <p><strong>Phone numbers:</strong></p>
+  <ul>{% for pn in phone_numbers %}<li>{{ pn }}</li>{% empty %}<li class="text-muted">No phone numbers available.</li>{% endfor %}</ul>
+  <a href="#" class="btn btn-primary">Start Call</a>
+</div></div>
+{% endblock %}

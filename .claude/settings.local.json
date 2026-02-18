@@ -5,7 +5,8 @@
       "WebFetch(domain:www.realauction.com)",
       "WebFetch(domain:foreclosureauctiondata.com)",
       "Bash(dir:*)",
-      "Bash(.venv/Scripts/python.exe:*)"
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(python:*)"
     ]
   }
 }

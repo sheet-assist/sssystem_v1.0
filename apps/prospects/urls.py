@@ -23,6 +23,8 @@ urlpatterns = [
     path("detail/<int:pk>/research/", views.ResearchUpdateView.as_view(), name="research"),
     path("detail/<int:pk>/transition/", views.WorkflowTransitionView.as_view(), name="transition"),
     path("detail/<int:pk>/history/", views.ProspectHistoryView.as_view(), name="history"),
+    path("detail/<int:pk>/autodialer/", views.ProspectAutodialerView.as_view(), name="autodialer"),
+    path("detail/<int:pk>/email/", views.ProspectEmailView.as_view(), name="email"),
 
     # Digital Folder (documents)
     path("detail/<int:pk>/documents/v2/list/", views.prospect_documents_list_v2, name="documents_list_v2"),

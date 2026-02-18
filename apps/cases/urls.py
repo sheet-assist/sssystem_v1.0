@@ -12,5 +12,7 @@ urlpatterns = [
     path("<int:pk>/followups/add/", views.CaseFollowUpCreateView.as_view(), name="followup_add"),
     path("<int:pk>/followups/<int:followup_pk>/complete/", views.CaseFollowUpCompleteView.as_view(), name="followup_complete"),
     path("<int:pk>/history/", views.CaseHistoryView.as_view(), name="history"),
+    path("<int:pk>/autodialer/", views.CaseAutodialerView.as_view(), name="autodialer"),
+    path("<int:pk>/email/", views.CaseEmailView.as_view(), name="email"),
     path("convert/<int:pk>/", views.ConvertProspectToCaseView.as_view(), name="convert"),
 ]

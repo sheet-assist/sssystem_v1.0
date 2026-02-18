@@ -17,10 +17,31 @@
     <a href="{% url 'cases:list' %}" class="btn btn-sm btn-outline-secondary">Back to List</a>
   </div>
 </div>
+<div class="mt-2">
+  <a href="{% url 'cases:autodialer' object.pk %}" class="btn btn-outline-secondary btn-sm me-1">
+    <i class="bi bi-telephone"></i> Autodialer
+  </a>
+  <a href="{% url 'cases:email' object.pk %}" class="btn btn-outline-secondary btn-sm me-1">
+    <i class="bi bi-envelope"></i> Email
+  </a>
+</div>
 
-<div class="row">
+<div class="row g-3 align-items-start">
+
+  <!-- Timeline Sidebar (sticky right) -->
+  <div class="col-lg-3 order-lg-last">
+    <div class="card" style="position:sticky;top:66px;max-height:calc(100vh - 82px);overflow-y:auto;">
+      <div class="card-header fw-semibold py-2" style="font-size:.85rem;">
+        <i class="bi bi-diagram-3 me-1"></i> Lifecycle Timeline
+      </div>
+      <div class="card-body p-2">
+        {% include "includes/_lifecycle_timeline.html" %}
+      </div>
+    </div>
+  </div>
+
   <!-- Case Info -->
-  <div class="col-md-6">
+  <div class="col-lg-4 order-lg-first">
     <div class="card mb-3">
       <div class="card-header"><strong>Case Information</strong></div>
       <div class="card-body">
@@ -63,7 +84,7 @@
   </div>
 
   <!-- Notes & Follow-ups -->
-  <div class="col-md-6">
+  <div class="col-lg-5">
     <!-- Notes -->
     <div class="card mb-3">
       <div class="card-header d-flex justify-content-between align-items-center">
@@ -116,4 +137,5 @@
     </div>
   </div>
 </div>
+
 {% endblock %}

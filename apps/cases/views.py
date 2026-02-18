@@ -68,8 +68,20 @@ class CaseDetailView(CasesAccessMixin, DetailView):
 
     def get_queryset(self):
         return Case.objects.select_related(
-            "county", "county__state", "assigned_to", "prospect"
-        ).prefetch_related("notes__author", "followups__assigned_to", "action_logs__user")
+            "county", "county__state", "assigned_to",
+            "prospect", "prospect__assigned_to", "prospect__assigned_by",
+        ).prefetch_related(
+            "notes__author",
+            "followups__assigned_to",
+            "action_logs__user",
+            "prospect__action_logs__user",
+        )
+
+    def get_context_data(self, **kwargs):
+        from apps.prospects.views import _build_lifecycle_timeline
+        ctx = super().get_context_data(**kwargs)
+        ctx["timeline"] = _build_lifecycle_timeline(self.object.prospect)
+        return ctx
 
 
 class ConvertProspectToCaseView(CasesAccessMixin, FormView):
@@ -207,4 +219,24 @@ class CaseHistoryView(CasesAccessMixin, DetailView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["logs"] = self.object.action_logs.select_related("user").all()
+        return ctx
+
+
+class CaseAutodialerView(CasesAccessMixin, DetailView):
+    model = Case
+    template_name = "cases/autodialer.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["phone_numbers"] = []
+        return ctx
+
+
+class CaseEmailView(CasesAccessMixin, DetailView):
+    model = Case
+    template_name = "cases/email_send.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["email_addresses"] = []
         return ctx

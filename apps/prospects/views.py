@@ -25,6 +25,8 @@ from apps.settings_app.models import SSRevenueSetting
 from .filters import ProspectFilter
 from .forms import AssignProspectForm, ProspectNoteForm, ResearchForm, WorkflowTransitionForm
 from .models import Prospect, ProspectNote, log_prospect_action
+from django.views.generic import FormView
+from django.shortcuts import render
 
 User = get_user_model()
 
@@ -228,6 +230,27 @@ class TypeSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, TemplateVie
         ctx["can_view_revenue"] = can_view_revenue
         ctx["ss_revenue_tier"] = ss_revenue_tier
         return ctx
+
+
+class ProspectAutodialerView(ProspectsAccessMixin, DetailView):
+    model = Prospect
+    template_name = "prospects/autodialer.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["phone_numbers"] = []
+        return ctx
+
+
+class ProspectEmailView(ProspectsAccessMixin, DetailView):
+    model = Prospect
+    template_name = "prospects/email_send.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["email_addresses"] = []
+        return ctx
+    
 
 
 class StateSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, ListView):
