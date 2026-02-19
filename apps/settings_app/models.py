@@ -112,10 +112,10 @@ class FilterCriteria(models.Model):
             if min_value is None and max_value is None:
                 return None
             if min_value is not None and max_value is None:
-                return f"{label} higher than ${min_value:,.0f}"
+                return f"{label} higher than or equal to ${min_value:,.0f} USD"
             if min_value is None and max_value is not None:
-                return f"{label} up to ${max_value:,.0f}"
-            return f"{label} between ${min_value:,.0f} and ${max_value:,.0f}"
+                return f"{label} up to ${max_value:,.0f} USD"
+            return f"{label} between ${min_value:,.0f} USD and ${max_value:,.0f} USD"
 
         for text in [
             money_text("plaintiff max bid", self.plaintiff_max_bid_min, self.plaintiff_max_bid_max),

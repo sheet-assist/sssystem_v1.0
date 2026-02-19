@@ -18,7 +18,7 @@
     </div>
 
     <div class="row">
-        <div class="col-lg-8">
+        <div class="col-lg-9">
             <div class="card">
                 <div class="card-header bg-light">
                     <h5 class="mb-0">Configuration Settings</h5>
@@ -51,23 +51,37 @@
                             </div>
                         </fieldset>
 
-                        <!-- Prospect Types -->
+                        <!-- Data Source URLs -->
                         <fieldset class="mb-4">
                             <legend class="h6 mb-3">Data Source URLs</legend>
 
-                            <div class="mb-3">
-                                <label for="{{ form.realtdm_url.id_for_label }}" class="form-label">RealTDM URL</label>
+                            <div class="mb-3 border rounded p-3">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="form-check form-switch mb-0 me-2">
+                                        <input class="form-check-input url-toggle" type="checkbox" role="switch"
+                                               id="enable_realtdm_url"
+                                               data-target="{{ form.realtdm_url.id_for_label }}"
+                                               {% if form.realtdm_url.value %}checked{% endif %}>
+                                    </div>
+                                    <label class="fw-semibold mb-0" for="enable_realtdm_url">RealTDM URL</label>
+                                </div>
                                 {{ form.realtdm_url }}
-                                <small class="text-muted">URL for the RealTDM data source</small>
                                 {% if form.realtdm_url.errors %}
                                 <div class="invalid-feedback d-block">{{ form.realtdm_url.errors }}</div>
                                 {% endif %}
                             </div>
 
-                            <div class="mb-3">
-                                <label for="{{ form.auction_calendar_url.id_for_label }}" class="form-label">Auction Calendar URL</label>
+                            <div class="mb-3 border rounded p-3">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="form-check form-switch mb-0 me-2">
+                                        <input class="form-check-input url-toggle" type="checkbox" role="switch"
+                                               id="enable_auction_calendar_url"
+                                               data-target="{{ form.auction_calendar_url.id_for_label }}"
+                                               {% if form.auction_calendar_url.value %}checked{% endif %}>
+                                    </div>
+                                    <label class="fw-semibold mb-0" for="enable_auction_calendar_url">Auction Calendar URL</label>
+                                </div>
                                 {{ form.auction_calendar_url }}
-                                <small class="text-muted">URL for the auction calendar source</small>
                                 {% if form.auction_calendar_url.errors %}
                                 <div class="invalid-feedback d-block">{{ form.auction_calendar_url.errors }}</div>
                                 {% endif %}
@@ -89,7 +103,7 @@
         </div>
 
         <!-- Info Panel -->
-        <div class="col-lg-4">
+        <div class="col-lg-3">
             <div class="card mb-4">
                 <div class="card-header bg-light">
                     <h5 class="mb-0">County Information</h5>
@@ -136,4 +150,39 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    function applyToggle(checkbox) {
+        var field = document.getElementById(checkbox.dataset.target);
+        if (!field) return;
+        if (checkbox.checked) {
+            field.disabled = false;
+        } else {
+            field.value = '';
+            field.disabled = true;
+        }
+    }
+
+    document.querySelectorAll('.url-toggle').forEach(function (checkbox) {
+        applyToggle(checkbox);  // initialise on page load
+
+        checkbox.addEventListener('change', function () {
+            applyToggle(this);
+        });
+    });
+
+    // Before submit: re-enable disabled fields so the empty value is sent to the server
+    document.querySelector('form').addEventListener('submit', function () {
+        document.querySelectorAll('.url-toggle').forEach(function (checkbox) {
+            if (!checkbox.checked) {
+                var field = document.getElementById(checkbox.dataset.target);
+                if (field) field.disabled = false;
+            }
+        });
+    });
+}());
+</script>
 {% endblock %}

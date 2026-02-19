@@ -11,6 +11,16 @@ class CountyConfigForm(forms.ModelForm):
             'auction_calendar_url',
             'realtdm_url',
         ]
+        widgets = {
+            'realtdm_url': forms.URLInput(attrs={
+                'class': 'form-control font-monospace',
+                'placeholder': 'https://',
+            }),
+            'auction_calendar_url': forms.URLInput(attrs={
+                'class': 'form-control font-monospace',
+                'placeholder': 'https://',
+            }),
+        }
 
 
 class CountyForm(forms.ModelForm):
