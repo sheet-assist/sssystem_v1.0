@@ -63,6 +63,7 @@
             {% if case.status == "active" %}<span class="badge bg-success" style="font-size: 0.6rem;">Active</span>
             {% elif case.status == "monitoring" %}<span class="badge bg-info" style="font-size: 0.6rem;">Monitoring</span>
             {% elif case.status == "follow_up" %}<span class="badge bg-warning text-dark" style="font-size: 0.6rem;">Follow Up</span>
+            {% elif case.status == "invoice_paid" %}<span class="badge bg-dark" style="font-size: 0.6rem;">Invoice Paid</span>
             {% elif case.status == "closed_won" %}<span class="badge bg-primary" style="font-size: 0.6rem;">Closed Won</span>
             {% elif case.status == "closed_lost" %}<span class="badge bg-danger" style="font-size: 0.6rem;">Closed Lost</span>
             {% endif %}

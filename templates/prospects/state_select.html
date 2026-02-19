@@ -233,6 +233,7 @@
         <th>Case #</th>
         <th class="d-none d-md-table-cell">State</th>
         <th class="d-none d-md-table-cell">County</th>
+        <th class="d-none d-lg-table-cell">Source</th>
         <th class="d-none d-lg-table-cell">Parcel ID</th>
         <th>Address</th>
         <th>Auction Date</th>
@@ -261,6 +262,7 @@
         </td>
         <td class="align-middle d-none d-md-table-cell">{{ prospect.county.state.abbreviation }}</td>
         <td class="align-middle d-none d-md-table-cell">{{ prospect.county.name }}</td>
+        <td class="align-middle d-none d-lg-table-cell">{{ prospect.source|default:"<span class=\"text-muted\">-</span>" }}</td>
         <td class="align-middle d-none d-lg-table-cell">
           {% if prospect.parcel_id %}
             <a href="{% if prospect.parcel_url %}{{ prospect.parcel_url }}{% else %}https://apps.miamidadepa.gov/PropertySearch/#/?folio={{ prospect.parcel_id|cut:'-' }}{% endif %}"
@@ -371,7 +373,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="{% if can_view_revenue %}14{% else %}11{% endif %}" class="text-center text-muted py-4">No prospects found.</td>
+        <td colspan="{% if can_view_revenue %}15{% else %}12{% endif %}" class="text-center text-muted py-4">No prospects found.</td>
       </tr>
       {% endfor %}
     </tbody>

@@ -10,6 +10,7 @@ from django.views import View
 from django.views.generic import TemplateView
 
 from apps.accounts.models import UserProfile
+from apps.cases.models import Case
 from apps.locations.models import County, State
 from apps.prospects.models import Prospect
 from apps.settings_app.models import SSRevenueSetting
@@ -151,6 +152,102 @@ def _compute_type_distribution(qs, tier_percent):
     return {"labels": labels, "surplus": surplus, "ss_revenue": ss_revenue}
 
 
+def _compute_prospect_revenue_by_type(qs, tier_percent):
+    rows = (
+        qs.values("prospect_type")
+        .annotate(
+            prospect_count=Count("id"),
+            qualified_count=Count("id", filter=Q(qualification_status="qualified")),
+            total_surplus=Sum("surplus_amount"),
+        )
+        .order_by("prospect_type")
+    )
+
+    row_map = {r["prospect_type"]: r for r in rows}
+    table_rows = []
+    labels = []
+    surplus_data = []
+    revenue_data = []
+
+    for code, label in Prospect.PROSPECT_TYPES:
+        r = row_map.get(code, {})
+        total_surplus = float(r.get("total_surplus") or 0)
+        revenue = total_surplus * tier_percent / 100
+        table_rows.append(
+            {
+                "code": code,
+                "label": label,
+                "prospect_count": r.get("prospect_count", 0) or 0,
+                "qualified_count": r.get("qualified_count", 0) or 0,
+                "total_surplus": round(total_surplus, 2),
+                "prospect_revenue": round(revenue, 2),
+            }
+        )
+        labels.append(code)
+        surplus_data.append(round(total_surplus, 2))
+        revenue_data.append(round(revenue, 2))
+
+    return {
+        "rows": table_rows,
+        "chart": {
+            "labels": labels,
+            "surplus": surplus_data,
+            "prospect_revenue": revenue_data,
+        },
+    }
+
+
+def _compute_case_revenue_by_type(case_qs, tier_percent):
+    rows = (
+        case_qs.values("case_type")
+        .annotate(
+            total_case_count=Count("id"),
+            invoice_paid_count=Count("id", filter=Q(status="invoice_paid")),
+            qualified_surplus=Sum("prospect__surplus_amount", filter=Q(prospect__qualification_status="qualified")),
+            invoice_paid_qualified_surplus=Sum(
+                "prospect__surplus_amount",
+                filter=Q(status="invoice_paid", prospect__qualification_status="qualified"),
+            ),
+        )
+        .order_by("case_type")
+    )
+
+    row_map = {r["case_type"]: r for r in rows}
+    table_rows = []
+    labels = []
+    prospect_rev_data = []
+    invoice_paid_rev_data = []
+
+    for code, label in Case.CASE_TYPE_CHOICES:
+        r = row_map.get(code, {})
+        qualified_surplus = float(r.get("qualified_surplus") or 0)
+        invoice_paid_qualified_surplus = float(r.get("invoice_paid_qualified_surplus") or 0)
+        prospect_rev = qualified_surplus * tier_percent / 100
+        invoice_paid_rev = invoice_paid_qualified_surplus * tier_percent / 100
+        table_rows.append(
+            {
+                "code": code,
+                "label": label,
+                "total_case_count": r.get("total_case_count", 0) or 0,
+                "invoice_paid_count": r.get("invoice_paid_count", 0) or 0,
+                "prospect_rev": round(prospect_rev, 2),
+                "invoice_paid_rev": round(invoice_paid_rev, 2),
+            }
+        )
+        labels.append(code)
+        prospect_rev_data.append(round(prospect_rev, 2))
+        invoice_paid_rev_data.append(round(invoice_paid_rev, 2))
+
+    return {
+        "rows": table_rows,
+        "chart": {
+            "labels": labels,
+            "prospect_rev": prospect_rev_data,
+            "invoice_paid_rev": invoice_paid_rev_data,
+        },
+    }
+
+
 def _compute_user_revenue(qs, tier_percent, global_ars_tier):
     rows = (
         qs.filter(assigned_to__isnull=False)
@@ -264,6 +361,12 @@ class FinanceDashboardView(LoginRequiredMixin, TemplateView):
             "qualification_status": "qualified",
         }
         qs = _build_base_qs(params)
+        doc_tables_params = {
+            **params,
+            "prospect_types": None,
+            "qualification_status": None,
+        }
+        doc_tables_qs = _build_base_qs(doc_tables_params)
 
         ctx["kpi"] = _compute_kpi(qs, tier, ars_tier)
         ctx["revenue_over_time"] = _compute_revenue_over_time(qs, "daily", tier, ars_tier)
@@ -271,6 +374,9 @@ class FinanceDashboardView(LoginRequiredMixin, TemplateView):
         ctx["type_distribution"] = _compute_type_distribution(qs, tier)
         ctx["user_revenue"] = _compute_user_revenue(qs, tier, ars_tier)
         ctx["threshold_distribution"] = _compute_threshold_distribution(qs, t1, t2, t3)
+        case_qs = Case.objects.filter(prospect__in=doc_tables_qs).select_related("prospect")
+        ctx["prospect_revenue_by_type"] = _compute_prospect_revenue_by_type(doc_tables_qs, tier)
+        ctx["case_revenue_by_type"] = _compute_case_revenue_by_type(case_qs, tier)
 
         ctx["settings_info"] = {"tier_percent": tier, "ars_tier_percent": ars_tier}
         ctx["start_date"] = start.isoformat()
@@ -302,6 +408,12 @@ class FinanceDataAPI(LoginRequiredMixin, View):
         t3 = float(settings.surplus_threshold_3)
 
         qs = _build_base_qs(params)
+        doc_tables_params = {
+            **params,
+            "prospect_types": None,
+            "qualification_status": None,
+        }
+        doc_tables_qs = _build_base_qs(doc_tables_params)
 
         data = {
             "kpi": _compute_kpi(qs, tier, ars_tier),
@@ -310,6 +422,11 @@ class FinanceDataAPI(LoginRequiredMixin, View):
             "type_distribution": _compute_type_distribution(qs, tier),
             "user_revenue": _compute_user_revenue(qs, tier, ars_tier),
             "threshold_distribution": _compute_threshold_distribution(qs, t1, t2, t3),
+            "prospect_revenue_by_type": _compute_prospect_revenue_by_type(doc_tables_qs, tier),
+            "case_revenue_by_type": _compute_case_revenue_by_type(
+                Case.objects.filter(prospect__in=doc_tables_qs).select_related("prospect"),
+                tier,
+            ),
             "start": params["start"].isoformat(),
             "end": params["end"].isoformat(),
             "mode": mode,

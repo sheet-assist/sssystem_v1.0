@@ -197,6 +197,95 @@
   </div>
 </div>
 
+{# -- 6b. Prospect/Case Revenue by Type (Table + Chart) -- #}
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="card-title">Prospect Revenue by Doc Type</h6>
+        <div class="table-responsive mb-2">
+          <table class="table table-sm table-borderless mb-0 align-middle" style="font-size:.78rem;">
+            <thead>
+              <tr class="text-muted">
+                <th>Type</th>
+                <th class="text-end">Count</th>
+                <th class="text-end">Qualified</th>
+                <th class="text-end">Surplus</th>
+                <th class="text-end">Revenue</th>
+              </tr>
+            </thead>
+            <tbody id="prospectTypeRevTableBody"></tbody>
+          </table>
+        </div>
+        <div class="chart-wrap" style="height:240px;">
+          <canvas id="chartProspectTypeRevenue"></canvas>
+          <div class="chart-empty-overlay d-none" id="emptyProspectTypeRevenue">
+            <span class="text-muted">No data for selected filters</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="card-title">Case Revenue by Doc Type</h6>
+        <div class="table-responsive mb-2">
+          <table class="table table-sm table-borderless mb-0 align-middle" style="font-size:.78rem;">
+            <thead>
+              <tr class="text-muted">
+                <th>Type</th>
+                <th class="text-end">Cases</th>
+                <th class="text-end">Inv Paid</th>
+                <th class="text-end">Prospect Rev</th>
+                <th class="text-end">Inv Paid Rev</th>
+              </tr>
+            </thead>
+            <tbody id="caseTypeRevTableBody"></tbody>
+          </table>
+        </div>
+        <div class="chart-wrap" style="height:240px;">
+          <canvas id="chartCaseTypeRevenue"></canvas>
+          <div class="chart-empty-overlay d-none" id="emptyCaseTypeRevenue">
+            <span class="text-muted">No data for selected filters</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# -- 6c. ARS Payout by User (Table + Chart) -- #}
+<div class="row g-3 mb-4">
+  <div class="col-lg-12">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="card-title">ARS Payout by User</h6>
+        <div class="table-responsive mb-2">
+          <table class="table table-sm table-borderless mb-0 align-middle" style="font-size:.78rem;">
+            <thead>
+              <tr class="text-muted">
+                <th>User</th>
+                <th class="text-end">Surplus</th>
+                <th class="text-end">SS Revenue</th>
+                <th class="text-end">ARS Payout</th>
+                <th class="text-end">SS Benefit</th>
+              </tr>
+            </thead>
+            <tbody id="arsByUserTableBody"></tbody>
+          </table>
+        </div>
+        <div class="chart-wrap" style="height:280px;">
+          <canvas id="chartArsByUser"></canvas>
+          <div class="chart-empty-overlay d-none" id="emptyArsByUser">
+            <span class="text-muted">No data for selected filters</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 {# ── 7. Threshold Distribution ── #}
 <div class="row g-3 mb-4">
   <div class="col-lg-6 mx-auto">
@@ -221,6 +310,8 @@
 {{ type_distribution|json_script:"init-type" }}
 {{ user_revenue|json_script:"init-user" }}
 {{ threshold_distribution|json_script:"init-threshold" }}
+{{ prospect_revenue_by_type|json_script:"init-prospect-type-rev" }}
+{{ case_revenue_by_type|json_script:"init-case-type-rev" }}
 {{ filter_options|json_script:"init-filters" }}
 
 {% endblock %}
@@ -345,7 +436,7 @@
   }
 
   /* ── charts init ── */
-  let chartRevTime, chartCounty, chartTypeDoughnut, chartTypeBar, chartUser, chartThreshold;
+  let chartRevTime, chartCounty, chartTypeDoughnut, chartTypeBar, chartUser, chartThreshold, chartProspectTypeRevenue, chartCaseTypeRevenue, chartArsByUser;
 
   function initCharts(){
     chartRevTime = new Chart($('#chartRevTime'), {
@@ -382,6 +473,24 @@
       type:'pie',
       data:{ labels:[], datasets:[] },
       options:{ ...chartOpts, plugins:{ legend:{ position:'right' } } }
+    });
+
+    chartProspectTypeRevenue = new Chart($('#chartProspectTypeRevenue'), {
+      type:'bar',
+      data:{ labels:[], datasets:[] },
+      options:{ ...chartOpts, scales:{ y: moneyAxis } }
+    });
+
+    chartCaseTypeRevenue = new Chart($('#chartCaseTypeRevenue'), {
+      type:'bar',
+      data:{ labels:[], datasets:[] },
+      options:{ ...chartOpts, scales:{ y: moneyAxis } }
+    });
+
+    chartArsByUser = new Chart($('#chartArsByUser'), {
+      type:'bar',
+      data:{ labels:[], datasets:[] },
+      options:{ ...chartOpts, scales:{ y: moneyAxis } }
     });
   }
 
@@ -455,6 +564,78 @@
     toggleEmpty('emptyThreshold', !((d.counts||[]).reduce((a,b)=>a+b,0)));
   }
 
+  function updateProspectTypeRevenue(d){
+    const rows = d.rows || [];
+    const tbody = $('#prospectTypeRevTableBody');
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td><span class="badge bg-secondary">${r.code}</span></td>
+        <td class="text-end">${Number(r.prospect_count||0)}</td>
+        <td class="text-end">${Number(r.qualified_count||0)}</td>
+        <td class="text-end">${money(r.total_surplus)}</td>
+        <td class="text-end">${money(r.prospect_revenue)}</td>
+      </tr>
+    `).join('');
+
+    const c = d.chart || {};
+    chartProspectTypeRevenue.data.labels = c.labels || [];
+    chartProspectTypeRevenue.data.datasets = [
+      { label:'Surplus', data: c.surplus || [], backgroundColor: C.surplus },
+      { label:'Prospect Revenue', data: c.prospect_revenue || [], backgroundColor: C.revenue },
+    ];
+    chartProspectTypeRevenue.update();
+    toggleEmpty('emptyProspectTypeRevenue', !(c.labels||[]).length);
+  }
+
+  function updateCaseTypeRevenue(d){
+    const rows = d.rows || [];
+    const tbody = $('#caseTypeRevTableBody');
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td><span class="badge bg-secondary">${r.code}</span></td>
+        <td class="text-end">${Number(r.total_case_count||0)}</td>
+        <td class="text-end">${Number(r.invoice_paid_count||0)}</td>
+        <td class="text-end">${money(r.prospect_rev)}</td>
+        <td class="text-end">${money(r.invoice_paid_rev)}</td>
+      </tr>
+    `).join('');
+
+    const c = d.chart || {};
+    chartCaseTypeRevenue.data.labels = c.labels || [];
+    chartCaseTypeRevenue.data.datasets = [
+      { label:'Prospect Rev', data: c.prospect_rev || [], backgroundColor: C.revenue },
+      { label:'Invoice Paid Rev', data: c.invoice_paid_rev || [], backgroundColor: C.ars },
+    ];
+    chartCaseTypeRevenue.update();
+    toggleEmpty('emptyCaseTypeRevenue', !(c.labels||[]).length);
+  }
+
+  function updateArsByUser(d){
+    const labels = d.labels || [];
+    const surplus = d.surplus || [];
+    const ssRevenue = d.ss_revenue || [];
+    const arsPayout = d.ars_payout || [];
+    const ssBenefit = d.ss_benefit || [];
+
+    const tbody = $('#arsByUserTableBody');
+    tbody.innerHTML = labels.map((name, idx) => `
+      <tr>
+        <td>${name}</td>
+        <td class="text-end">${money(surplus[idx])}</td>
+        <td class="text-end">${money(ssRevenue[idx])}</td>
+        <td class="text-end">${money(arsPayout[idx])}</td>
+        <td class="text-end">${money(ssBenefit[idx])}</td>
+      </tr>
+    `).join('');
+
+    chartArsByUser.data.labels = labels;
+    chartArsByUser.data.datasets = [
+      { label:'ARS Payout', data: arsPayout, backgroundColor: C.ars },
+    ];
+    chartArsByUser.update();
+    toggleEmpty('emptyArsByUser', !labels.length);
+  }
+
   function updateAll(data){
     updateKPI(data.kpi || {});
     updateRevTime(data.revenue_over_time || {});
@@ -463,6 +644,9 @@
     updateTypeBar(data.type_distribution || {});
     updateUser(data.user_revenue || {});
     updateThreshold(data.threshold_distribution || {});
+    updateProspectTypeRevenue(data.prospect_revenue_by_type || {});
+    updateCaseTypeRevenue(data.case_revenue_by_type || {});
+    updateArsByUser(data.user_revenue || {});
 
     // Hide type charts when single type filtered
     const singleType = selectedTypes.length === 1;
@@ -534,6 +718,8 @@
     type_distribution: J('init-type'),
     user_revenue: J('init-user'),
     threshold_distribution: J('init-threshold'),
+    prospect_revenue_by_type: J('init-prospect-type-rev'),
+    case_revenue_by_type: J('init-case-type-rev'),
   });
 })();
 </script>

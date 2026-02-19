@@ -189,6 +189,7 @@
       <tr>
         <th>Case #</th>
         <th class="d-none d-md-table-cell">Type</th>
+        <th class="d-none d-lg-table-cell">Source</th>
         <th class="d-none d-lg-table-cell">State / County</th>
         <th class="d-none d-lg-table-cell">Parcel ID</th>
         <th>Address</th>
@@ -218,6 +219,7 @@
           </a>
         </td>
         <td class="align-middle text-center d-none d-md-table-cell"><span class="badge bg-secondary">{{ prospect.prospect_type }}</span></td>
+        <td class="align-middle d-none d-lg-table-cell">{{ prospect.source|default:"<span class=\"text-muted\">-</span>" }}</td>
         <td class="align-middle d-none d-lg-table-cell">
           <div>{{ prospect.county.state.abbreviation }}</div>
           <div class="text-muted small">{{ prospect.county.name }}</div>
@@ -253,11 +255,11 @@
         {% endif %}
         <td class="align-middle text-center">
           {% if prospect.qualification_status == 'qualified' %}
-            <span class="badge bg-success">Qualified</span>
+            <span class="badge bg-success">Q</span>
           {% elif prospect.qualification_status == 'disqualified' %}
-            <span class="badge bg-danger">Disqualified</span>
+            <span class="badge bg-danger">D</span>
           {% else %}
-            <span class="badge bg-warning text-dark">Pending</span>
+            <span class="badge bg-warning text-dark">P</span>
           {% endif %}
         </td>
         <td class="align-middle text-center d-none d-lg-table-cell">
@@ -333,7 +335,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="{% if can_view_revenue %}15{% else %}12{% endif %}" class="text-center text-muted py-4">No prospects found.</td>
+        <td colspan="{% if can_view_revenue %}16{% else %}13{% endif %}" class="text-center text-muted py-4">No prospects found.</td>
       </tr>
       {% endfor %}
     </tbody>

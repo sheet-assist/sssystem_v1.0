@@ -5,20 +5,73 @@
 {% block content %}
 <h2 class="mb-4">Dashboard</h2>
 
+<div class="card mb-3">
+  <div class="card-body py-2 d-flex justify-content-end">
+    <div class="d-flex flex-wrap align-items-center gap-2 justify-content-end">
+      <small class="text-muted me-2">Auction Range: <span id="auctionRangeLabel">{{ auction_range_label }}</span></small>
+      <strong class="small text-muted">Cards Filter</strong>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Cards Filter Period">
+        <button type="button" class="btn btn-outline-success {% if cards_filter_mode == 'all' %}active{% endif %}" id="cardsModeAll">All</button>
+        <button type="button" class="btn btn-outline-success {% if cards_filter_mode == '30days' %}active{% endif %}" id="cardsMode30">30 Days</button>
+        <button type="button" class="btn btn-outline-success {% if cards_filter_mode == 'month' %}active{% endif %}" id="cardsModeMonth">Month</button>
+      </div>
+      <div class="d-flex align-items-center gap-1">
+        <button type="button" class="btn btn-sm btn-outline-secondary {% if cards_filter_mode == 'all' %}disabled{% endif %}" id="cardsPrev" title="Previous">&laquo;</button>
+        <span class="badge bg-light text-dark border px-2 py-1" id="cardsPeriodLabel" style="width:220px;display:inline-block;text-align:center;font-size:.82rem;">
+          {{ cards_filter_period_label }}
+        </span>
+        <button type="button" class="btn btn-sm btn-outline-secondary {% if cards_filter_mode == 'all' or cards_filter_is_latest %}disabled{% endif %}" id="cardsNext" title="Next">&raquo;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {# --- Top Stats Row --- #}
-<div class="row row-cols-1 row-cols-sm-2 row-cols-xl-5 g-3 mb-4">
+<div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4">
   <div class="col">
     <div class="card text-center h-100">
       <div class="card-body">
         <h6 class="card-subtitle text-muted mb-2">Total Prospects</h6>
-        <p class="fs-3 fw-semibold mb-0">{{ total_prospects }}</p>
+        <p class="fs-3 fw-semibold mb-0" id="cardTotalProspects">{{ total_prospects }}</p>
       </div>
       <div class="card-footer bg-transparent border-0 pt-0">
         <small>
-          <span class="text-success">{{ qualified_count }} qualified</span> /
-          <span class="text-danger">{{ disqualified_count }} disqualified</span> /
-          <span class="text-warning">{{ pending_count }} pending</span>
+          <span class="text-success"><span id="cardQualifiedCount">{{ qualified_count }}</span> qualified</span> /
+          <span class="text-danger"><span id="cardDisqualifiedCount">{{ disqualified_count }}</span> disqualified</span> /
+          <span class="text-warning"><span id="cardPendingCount">{{ pending_count }}</span> pending</span>
         </small>
+        <div class="mt-1">
+          <small>Qualified Surplus Amount: <span class="text-success">$<span id="cardQualifiedSurplus">{{ qualified_surplus_amount|floatformat:0 }}</span></span></small>
+        </div>
+        {% if is_admin %}
+        <div>
+          <small>Qualified Revenue (<span id="cardTierPct">{{ ss_revenue_tier }}</span>%): <span class="text-primary">$<span id="cardTotalRevenue">{{ total_revenue|floatformat:0 }}</span></span></small>
+        </div>
+        <div class="table-responsive mt-2">
+          <table class="table table-sm table-borderless mb-0 align-middle" style="font-size: 0.72rem;">
+            <thead>
+              <tr class="text-muted">
+                <th class="ps-0" title="Type: Prospect type code (TD, TL, SS, MF).">Type</th>
+                <th class="text-end" title="Prospect Count: Total number of prospects for this type.">P</th>
+                <th class="text-end" title="Qualified Count: Number of qualified prospects for this type.">Q</th>
+                <th class="text-end" title="Total Surplus: Sum of qualified surplus amounts for this type.">Surplus</th>
+                <th class="text-end pe-0" title="Prospect Revenue: Revenue calculated from qualified surplus using the configured tier.">Rev</th>
+              </tr>
+            </thead>
+            <tbody id="cardProspectRevTypeBody">
+              {% for item in revenue_distribution_prospects_by_type %}
+              <tr>
+                <td class="ps-0"><span class="badge bg-secondary">{{ item.code }}</span></td>
+                <td class="text-end">{{ item.prospect_count }}</td>
+                <td class="text-end">{{ item.qualified_count }}</td>
+                <td class="text-end">${{ item.total_surplus|floatformat:0 }}</td>
+                <td class="text-end pe-0">${{ item.prospect_revenue|floatformat:0 }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -26,10 +79,45 @@
     <div class="card text-center h-100">
       <div class="card-body">
         <h6 class="card-subtitle text-muted mb-2">Active Cases</h6>
-        <p class="fs-3 fw-semibold mb-0">{{ active_cases }}</p>
+        <p class="fs-3 fw-semibold mb-0" id="cardActiveCases">{{ active_cases }}</p>
       </div>
       <div class="card-footer bg-transparent border-0 pt-0">
-        <small>{{ total_cases }} total &middot; <span class="text-success">{{ closed_won }} won</span> &middot; <span class="text-danger">{{ closed_lost }} lost</span></small>
+        <small><span id="cardTotalCases">{{ total_cases }}</span> total &middot; <span class="text-success"><span id="cardClosedWon">{{ closed_won }}</span> won</span> &middot; <span class="text-danger"><span id="cardClosedLost">{{ closed_lost }}</span> lost</span></small>
+        {% if is_admin %}
+        <div class="mt-1">
+          <small>Surplus Amount: <span class="text-success">$<span id="cardCaseQualifiedSurplus">{{ case_qualified_prospect_amount|floatformat:0 }}</span></span></small>
+        </div>
+        <div>
+          <small>Case Revenue (<span id="cardTierPct2">{{ ss_revenue_tier }}</span>%): <span class="text-primary">$<span id="cardCaseRevenue">{{ case_revenue|floatformat:0 }}</span></span></small>
+        </div>
+        <div>
+          <small>Invoice Paid Revenue: <span class="text-dark">$<span id="cardInvoicePaidRevenue">{{ invoice_paid_revenue|floatformat:0 }}</span></span></small>
+        </div>
+        <div class="table-responsive mt-2">
+          <table class="table table-sm table-borderless mb-0 align-middle" style="font-size: 0.72rem;">
+            <thead>
+              <tr class="text-muted">
+                <th class="ps-0" title="Type: Case type code (TD, TL, SS, MF).">Type</th>
+                <th class="text-end" title="Case Count: Total cases for this type.">C</th>
+                <th class="text-end" title="Invoice Paid Count: Cases with status set to Invoice Paid.">IP</th>
+                <th class="text-end" title="Prospect Revenue: Revenue from qualified case-linked prospect surplus for this type.">Rev</th>
+                <th class="text-end pe-0" title="Invoice Paid Revenue: Revenue from qualified surplus where case status is Invoice Paid.">IP Rev</th>
+              </tr>
+            </thead>
+            <tbody id="cardCaseRevTypeBody">
+              {% for item in revenue_distribution_cases_by_type %}
+              <tr>
+                <td class="ps-0"><span class="badge bg-secondary">{{ item.code }}</span></td>
+                <td class="text-end">{{ item.total_case_count }}</td>
+                <td class="text-end">{{ item.invoice_paid_count }}</td>
+                <td class="text-end">${{ item.prospect_rev|floatformat:0 }}</td>
+                <td class="text-end pe-0">${{ item.invoice_paid_rev|floatformat:0 }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -37,10 +125,32 @@
     <div class="card text-center h-100">
       <div class="card-body">
         <h6 class="card-subtitle text-muted mb-2">Conversion Rate</h6>
-        <p class="fs-3 fw-semibold mb-0">{{ conversion_rate }}%</p>
+        <p class="fs-3 fw-semibold mb-0"><span id="cardConversionRate">{{ conversion_rate }}</span>%</p>
       </div>
       <div class="card-footer bg-transparent border-0 pt-0">
-        <small>{{ converted_count }} of {{ total_prospects }} prospects converted</small>
+        <small><span id="cardConvertedCount">{{ converted_count }}</span> of <span id="cardConversionQualifiedTotal">{{ conversion_qualified_total }}</span> qualified prospects converted</small>
+        <div class="table-responsive mt-2">
+          <table class="table table-sm table-borderless mb-0 align-middle" style="font-size: 0.72rem;">
+            <thead>
+              <tr class="text-muted">
+                <th class="ps-0" title="Type: Prospect type code (TD, TL, SS, MF).">Type</th>
+                <th class="text-end" title="Count: Total prospects for this type.">Count</th>
+                <th class="text-end" title="Converted: Prospects with workflow status Converted.">Converted</th>
+                <th class="text-end pe-0" title="Conversion %: Converted divided by total prospects for this type.">Conv %</th>
+              </tr>
+            </thead>
+            <tbody id="cardConversionTypeBody">
+              {% for item in conversion_by_type %}
+              <tr>
+                <td class="ps-0"><span class="badge bg-secondary">{{ item.code }}</span></td>
+                <td class="text-end">{{ item.count }}</td>
+                <td class="text-end">{{ item.converted_count }}</td>
+                <td class="text-end pe-0">{{ item.conversion_percent|floatformat:1 }}%</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -48,21 +158,35 @@
     <div class="card text-center h-100">
       <div class="card-body">
         <h6 class="card-subtitle text-muted mb-2">Touched / Untouched</h6>
-        <p class="fs-3 fw-semibold mb-0">{{ touched_count }} / {{ untouched_count }}</p>
+        <p class="fs-3 fw-semibold mb-0"><span id="cardTouchedCount">{{ touched_count }}</span> / <span id="cardUntouchedCount">{{ untouched_count }}</span></p>
       </div>
       <div class="card-footer bg-transparent border-0 pt-0">
-        <small>{{ untouched_count }} prospects still at "New"</small>
-      </div>
-    </div>
-  </div>
-  <div class="col">
-    <div class="card text-center h-100">
-      <div class="card-body">
-        <h6 class="card-subtitle text-muted mb-2">Total Revenue  ({{ ss_revenue_tier }}%)</h6>
-        <p class="fs-4 fw-semibold mb-0">${{ total_revenue |floatformat:2 }}</p>
-      </div>
-      <div class="card-footer bg-transparent border-0 pt-0">
-        <small>Qualified Surplus Amount : <span class="text-success">${{ qualified_surplus_amount|floatformat:2 }}</span></small>
+        <small>
+          <span class="text-warning"><span id="cardTouchedInProgress">{{ touched_in_progress_count }}</span> in progress</span> /
+          <span class="text-secondary"><span id="cardTouchedClosed">{{ touched_closed_count }}</span> closed</span>
+        </small>
+        <div class="table-responsive mt-2">
+          <table class="table table-sm table-borderless mb-0 align-middle" style="font-size: 0.72rem;">
+            <thead>
+              <tr class="text-muted">
+                <th class="ps-0" title="Type: Prospect type code (TD, TL, SS, MF).">Type</th>
+                <th class="text-end" title="New: Qualified prospects still in workflow status New.">New</th>
+                <th class="text-end" title="In Progress: Qualified prospects in Assigned/Researching/Skip Tracing/Contacting/Contract Sent.">In Prog</th>
+                <th class="text-end pe-0" title="Closed: Qualified prospects in Converted or Dead status.">Closed</th>
+              </tr>
+            </thead>
+            <tbody id="cardTouchedTypeBody">
+              {% for item in touched_by_type %}
+              <tr>
+                <td class="ps-0"><span class="badge bg-secondary">{{ item.code }}</span></td>
+                <td class="text-end">{{ item.new_count }}</td>
+                <td class="text-end">{{ item.in_progress_count }}</td>
+                <td class="text-end pe-0">{{ item.closed_count }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -634,6 +758,168 @@
         return `${context.dataset.label}: ${Math.round(context.parsed.y)}`;
       },
       tooltipFormatter: (value) => `${value}`
+    });
+
+    // --- Cards stats filter (no page reload) ---
+    const cardsApiUrl = "{% url 'dashboard:cards_stats_api' %}";
+    const cardsModeAllBtn = document.getElementById("cardsModeAll");
+    const cardsMode30Btn = document.getElementById("cardsMode30");
+    const cardsModeMonthBtn = document.getElementById("cardsModeMonth");
+    const cardsPrevBtn = document.getElementById("cardsPrev");
+    const cardsNextBtn = document.getElementById("cardsNext");
+    const cardsPeriodLabel = document.getElementById("cardsPeriodLabel");
+
+    let cardsMode = "{{ cards_filter_mode }}";
+    let cardsStart = "{{ cards_filter_start }}";
+    let cardsEnd = "{{ cards_filter_end }}";
+
+    const fmtInt = (v) => Number(v || 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
+    const fmtMoney = (v) => Number(v || 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
+
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    }
+
+    function setCardsButtons(mode, isLatest) {
+      cardsModeAllBtn?.classList.toggle("active", mode === "all");
+      cardsMode30Btn?.classList.toggle("active", mode === "30days");
+      cardsModeMonthBtn?.classList.toggle("active", mode === "month");
+
+      if (cardsPrevBtn) cardsPrevBtn.classList.toggle("disabled", mode === "all");
+      if (cardsNextBtn) cardsNextBtn.classList.toggle("disabled", mode === "all" || !!isLatest);
+    }
+
+    function renderTableRows(tbodyId, rows, mapper) {
+      const tbody = document.getElementById(tbodyId);
+      if (!tbody) return;
+      tbody.innerHTML = (rows || []).map(mapper).join("");
+    }
+
+    function updateCards(data) {
+      cardsMode = data.cards_filter_mode || cardsMode;
+      cardsStart = data.cards_filter_start || "";
+      cardsEnd = data.cards_filter_end || "";
+      if (cardsPeriodLabel) cardsPeriodLabel.textContent = data.cards_filter_period_label || "All Time";
+      setText("auctionRangeLabel", data.auction_range_label || "-");
+      setCardsButtons(cardsMode, data.cards_filter_is_latest);
+
+      setText("cardTotalProspects", fmtInt(data.total_prospects));
+      setText("cardQualifiedCount", fmtInt(data.qualified_count));
+      setText("cardDisqualifiedCount", fmtInt(data.disqualified_count));
+      setText("cardPendingCount", fmtInt(data.pending_count));
+      setText("cardQualifiedSurplus", fmtMoney(data.qualified_surplus_amount));
+      setText("cardTotalRevenue", fmtMoney(data.total_revenue));
+      setText("cardTierPct", data.ss_revenue_tier ?? "");
+      setText("cardTierPct2", data.ss_revenue_tier ?? "");
+
+      renderTableRows("cardProspectRevTypeBody", data.revenue_distribution_prospects_by_type, (item) => `
+        <tr>
+          <td class="ps-0"><span class="badge bg-secondary">${item.code}</span></td>
+          <td class="text-end">${fmtInt(item.prospect_count)}</td>
+          <td class="text-end">${fmtInt(item.qualified_count)}</td>
+          <td class="text-end">$${fmtMoney(item.total_surplus)}</td>
+          <td class="text-end pe-0">$${fmtMoney(item.prospect_revenue)}</td>
+        </tr>
+      `);
+
+      setText("cardActiveCases", fmtInt(data.active_cases));
+      setText("cardTotalCases", fmtInt(data.total_cases));
+      setText("cardClosedWon", fmtInt(data.closed_won));
+      setText("cardClosedLost", fmtInt(data.closed_lost));
+      setText("cardCaseQualifiedSurplus", fmtMoney(data.case_qualified_prospect_amount));
+      setText("cardCaseRevenue", fmtMoney(data.case_revenue));
+      setText("cardInvoicePaidRevenue", fmtMoney(data.invoice_paid_revenue));
+
+      renderTableRows("cardCaseRevTypeBody", data.revenue_distribution_cases_by_type, (item) => `
+        <tr>
+          <td class="ps-0"><span class="badge bg-secondary">${item.code}</span></td>
+          <td class="text-end">${fmtInt(item.total_case_count)}</td>
+          <td class="text-end">${fmtInt(item.invoice_paid_count)}</td>
+          <td class="text-end">$${fmtMoney(item.prospect_rev)}</td>
+          <td class="text-end pe-0">$${fmtMoney(item.invoice_paid_rev)}</td>
+        </tr>
+      `);
+
+      setText("cardConversionRate", Number(data.conversion_rate || 0).toFixed(1));
+      setText("cardConvertedCount", fmtInt(data.converted_count));
+      setText("cardConversionQualifiedTotal", fmtInt(data.conversion_qualified_total));
+      renderTableRows("cardConversionTypeBody", data.conversion_by_type, (item) => `
+        <tr>
+          <td class="ps-0"><span class="badge bg-secondary">${item.code}</span></td>
+          <td class="text-end">${fmtInt(item.count)}</td>
+          <td class="text-end">${fmtInt(item.converted_count)}</td>
+          <td class="text-end pe-0">${Number(item.conversion_percent || 0).toFixed(1)}%</td>
+        </tr>
+      `);
+
+      setText("cardTouchedCount", fmtInt(data.touched_count));
+      setText("cardUntouchedCount", fmtInt(data.untouched_count));
+      setText("cardTouchedInProgress", fmtInt(data.touched_in_progress_count));
+      setText("cardTouchedClosed", fmtInt(data.touched_closed_count));
+      renderTableRows("cardTouchedTypeBody", data.touched_by_type, (item) => `
+        <tr>
+          <td class="ps-0"><span class="badge bg-secondary">${item.code}</span></td>
+          <td class="text-end">${fmtInt(item.new_count)}</td>
+          <td class="text-end">${fmtInt(item.in_progress_count)}</td>
+          <td class="text-end pe-0">${fmtInt(item.closed_count)}</td>
+        </tr>
+      `);
+    }
+
+    async function fetchCards(params) {
+      try {
+        const qs = new URLSearchParams(params).toString();
+        const resp = await fetch(`${cardsApiUrl}?${qs}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        updateCards(data);
+      } catch (e) {
+        console.error("Failed to fetch cards stats", e);
+      }
+    }
+
+    function cardsAddDays(dateStr, days) {
+      const d = new Date(dateStr + "T00:00:00");
+      d.setDate(d.getDate() + days);
+      return d.toISOString().slice(0, 10);
+    }
+
+    function cardsShiftMonthFromDate(dateStr, delta) {
+      const d = new Date(dateStr + "T00:00:00");
+      d.setMonth(d.getMonth() + delta);
+      return { year: d.getFullYear(), month: d.getMonth() + 1 };
+    }
+
+    cardsModeAllBtn?.addEventListener("click", () => fetchCards({ cards_mode: "all" }));
+    cardsMode30Btn?.addEventListener("click", () => fetchCards({ cards_mode: "30days" }));
+    cardsModeMonthBtn?.addEventListener("click", () => {
+      const t = new Date();
+      fetchCards({ cards_mode: "month", cards_year: t.getFullYear(), cards_month: t.getMonth() + 1 });
+    });
+
+    cardsPrevBtn?.addEventListener("click", () => {
+      if (cardsPrevBtn.classList.contains("disabled")) return;
+      if (cardsMode === "month" && cardsStart) {
+        const prev = cardsShiftMonthFromDate(cardsStart, -1);
+        fetchCards({ cards_mode: "month", cards_year: prev.year, cards_month: prev.month });
+      } else if (cardsMode === "30days" && cardsStart) {
+        const newEnd = cardsAddDays(cardsStart, -1);
+        const newStart = cardsAddDays(newEnd, -29);
+        fetchCards({ cards_mode: "30days", cards_start: newStart, cards_end: newEnd });
+      }
+    });
+
+    cardsNextBtn?.addEventListener("click", () => {
+      if (cardsNextBtn.classList.contains("disabled")) return;
+      if (cardsMode === "month" && cardsStart) {
+        const next = cardsShiftMonthFromDate(cardsStart, 1);
+        fetchCards({ cards_mode: "month", cards_year: next.year, cards_month: next.month });
+      } else if (cardsMode === "30days" && cardsEnd) {
+        const newStart = cardsAddDays(cardsEnd, 1);
+        const newEnd = cardsAddDays(newStart, 29);
+        fetchCards({ cards_mode: "30days", cards_start: newStart, cards_end: newEnd });
+      }
     });
   })();
 </script>

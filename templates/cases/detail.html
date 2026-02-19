@@ -7,6 +7,7 @@
     {% if object.status == "active" %}<span class="badge bg-success">Active</span>
     {% elif object.status == "monitoring" %}<span class="badge bg-info">Monitoring</span>
     {% elif object.status == "follow_up" %}<span class="badge bg-warning text-dark">Follow Up</span>
+    {% elif object.status == "invoice_paid" %}<span class="badge bg-dark">Invoice Paid</span>
     {% elif object.status == "closed_won" %}<span class="badge bg-primary">Closed Won</span>
     {% elif object.status == "closed_lost" %}<span class="badge bg-danger">Closed Lost</span>
     {% endif %}

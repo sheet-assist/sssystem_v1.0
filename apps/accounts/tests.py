@@ -126,7 +126,7 @@ class DashboardTest(TestCase):
         self.assertContains(resp, "Active Cases")
         self.assertContains(resp, "Conversion Rate")
         self.assertContains(resp, "Qualified Surplus Amount")
-        self.assertContains(resp, "Total Revenue")
+        self.assertContains(resp, "Revenue Distribution by Type")
         self.assertContains(resp, "Daily Qualified Count (Last 30 Days)")
         self.assertContains(resp, "Prospect Conversion % (Assigned to Converted by User)")
 

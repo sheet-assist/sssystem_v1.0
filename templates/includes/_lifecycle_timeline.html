@@ -58,7 +58,7 @@
     </button>
     <div class="collapse" id="lcev{{ forloop.counter }}">
       <div class="lc-details">
-        <div class="text-muted mb-1" style="font-size:.68rem;">{{ ev.date|date:"M d, Y H:i" }}</div>
+        <div class="text-muted mb-1" style="font-size:.68rem;">{{ ev.event_at|date:"M d, Y H:i" }}</div>
         {% if ev.description %}<p class="text-secondary">{{ ev.description }}</p>{% endif %}
         <span class="fst-italic text-muted">{{ ev.actor }}</span>
       </div>

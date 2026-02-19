@@ -16,6 +16,7 @@ class Case(models.Model):
         ("active", "Active"),
         ("monitoring", "Monitoring"),
         ("follow_up", "Follow Up"),
+        ("invoice_paid", "Invoice Paid"),
         ("closed_won", "Closed Won"),
         ("closed_lost", "Closed Lost"),
     ]
