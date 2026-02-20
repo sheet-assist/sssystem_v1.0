@@ -1,5 +1,5 @@
 import calendar
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from urllib.parse import urlencode
 from xml.sax.saxutils import escape
 
@@ -159,116 +159,6 @@ def _annotate_ars_calculations(qs):
         )
     )
 
-
-def _build_lifecycle_timeline(prospect):
-    """Build lifecycle events for Prospect/Case timeline sidebars."""
-    if not prospect:
-        return []
-
-    def _actor_name(user):
-        if not user:
-            return "System"
-        return user.get_full_name() or user.username
-
-    action_icon_color = {
-        "created": ("bi-plus-circle", "secondary"),
-        "updated": ("bi-pencil-square", "info"),
-        "qualified": ("bi-check-circle", "success"),
-        "disqualified": ("bi-x-circle", "danger"),
-        "assigned": ("bi-person-check", "primary"),
-        "note_added": ("bi-sticky", "secondary"),
-        "email_sent": ("bi-envelope", "info"),
-        "status_changed": ("bi-arrow-left-right", "warning"),
-        "converted_to_case": ("bi-briefcase", "success"),
-    }
-
-    timeline = []
-
-    for log in prospect.action_logs.select_related("user").all():
-        icon, color = action_icon_color.get(log.action_type, ("bi-clock-history", "secondary"))
-        timeline.append(
-            {
-                "phase": "prospect",
-                "icon": icon,
-                "color": color,
-                "label": getattr(log, "get_action_type_display", lambda: log.action_type)(),
-                "date": log.created_at,
-                "description": log.description or "",
-                "actor": _actor_name(log.user),
-            }
-        )
-
-    if prospect.auction_date:
-        timeline.append(
-            {
-                "phase": "prospect",
-                "icon": "bi-calendar-event",
-                "color": "primary",
-                "label": "Auction Date",
-                "date": prospect.auction_date,
-                "description": f"Auction scheduled for {prospect.auction_date:%m/%d/%Y}.",
-                "actor": "System",
-            }
-        )
-
-    if prospect.assigned_at:
-        assignee = prospect.assigned_to.get_full_name() if prospect.assigned_to else ""
-        timeline.append(
-            {
-                "phase": "prospect",
-                "icon": "bi-person-badge",
-                "color": "primary",
-                "label": "Assigned",
-                "date": prospect.assigned_at,
-                "description": f"Assigned to {assignee or 'user'}",
-                "actor": _actor_name(prospect.assigned_by),
-            }
-        )
-
-    if hasattr(prospect, "case"):
-        case_obj = prospect.case
-        timeline.append(
-            {
-                "phase": "case",
-                "icon": "bi-briefcase-fill",
-                "color": "success",
-                "label": "Case Created",
-                "date": case_obj.created_at,
-                "description": f"Case {case_obj.case_number or case_obj.pk} created from prospect.",
-                "actor": "System",
-            }
-        )
-        for log in case_obj.action_logs.select_related("user").all():
-            timeline.append(
-                {
-                    "phase": "case",
-                    "icon": "bi-journal-check",
-                    "color": "success",
-                    "label": (log.action_type or "Case Update").replace("_", " ").title(),
-                    "date": log.created_at,
-                    "description": log.description or "",
-                    "actor": _actor_name(log.user),
-                }
-            )
-
-    def _sort_dt(value):
-        if isinstance(value, datetime):
-            dt_value = value
-        elif isinstance(value, date):
-            dt_value = datetime.combine(value, datetime.min.time())
-        else:
-            dt_value = timezone.now()
-        if timezone.is_naive(dt_value):
-            dt_value = timezone.make_aware(dt_value, timezone.get_current_timezone())
-        return dt_value
-
-    for ev in timeline:
-        ev["event_at"] = _sort_dt(ev.get("date"))
-
-    timeline.sort(key=lambda ev: ev["event_at"])
-    return timeline
-
-
 class TypeSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, TemplateView):
     template_name = "prospects/type_select.html"
     export_filename_prefix = "prospects_type"
@@ -348,6 +238,7 @@ class ProspectAutodialerView(ProspectsAccessMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        # minimal context for now; integration with an autodialer service can be added later
         ctx["phone_numbers"] = []
         return ctx
 
@@ -631,11 +522,6 @@ class ProspectDetailView(ProspectsAccessMixin, DetailView):
             "action_logs__user",
             "rule_notes__created_by",
         )
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["timeline"] = _build_lifecycle_timeline(self.object)
-        return ctx
 
 
 # -------------------- Digital Folder endpoints --------------------
