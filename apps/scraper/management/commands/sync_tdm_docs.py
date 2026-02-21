@@ -1,37 +1,24 @@
-"""Daily TDM document sync for qualified prospects.
+"""Management command: sync TDM documents for qualified prospects.
 
 Scrapes the document list from Miami-Dade RealTDM for every qualified prospect,
 detects new documents, persists metadata to the DB, logs audit events, and
 auto-downloads Surplus Claim/Affidavit, COM_SURPLUS, and SURPLUS_LETTER PDFs.
 
+All run parameters are read from the JSON config file (default: apps/scraper/config/sync_config.json).
+Edit that file to change filters, headless mode, dry-run, etc.
+
 Usage:
-    python tdm/sync_tdm_docs.py
-    python tdm/sync_tdm_docs.py --headless
-    python tdm/sync_tdm_docs.py --case-numbers 2025A00886,2025A00123
-    python tdm/sync_tdm_docs.py --config tdm/my_config.json
-    python tdm/sync_tdm_docs.py --state FL --prospect-type TD --dry-run
-    python tdm/sync_tdm_docs.py --auction-start-date 2025-01-01 --auction-end-date 2025-12-31
+    python manage.py sync_tdm_docs
+    python manage.py sync_tdm_docs --config path/to/other_config.json
 """
 
-import argparse
 import json
-import os
-import sys
 import time
 from datetime import datetime
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Bootstrap Django — must happen before any app imports
-# ---------------------------------------------------------------------------
-BASE_DIR = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(BASE_DIR))
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
-
-import django
-django.setup()
-
 from django.conf import settings
+from django.core.management.base import BaseCommand
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 from apps.prospects.models import (
@@ -53,6 +40,7 @@ from tdm.download_surplus_affidavit_headless import (
 
 DOWNLOAD_TITLES = {"Surplus Claim/Affidavit", "COM_SURPLUS", "SURPLUS_LETTER"}
 
+BASE_DIR = Path(settings.BASE_DIR)
 MEDIA_ROOT = Path(getattr(settings, "MEDIA_ROOT", BASE_DIR / "media"))
 DEFAULT_CONFIG_PATH = BASE_DIR / "apps" / "scraper" / "config" / "sync_config.json"
 
@@ -68,7 +56,7 @@ BROWSER_ARGS = dict(
 
 
 # ---------------------------------------------------------------------------
-# Config
+# Config helpers
 # ---------------------------------------------------------------------------
 
 def load_config(path):
@@ -84,33 +72,9 @@ def load_config(path):
         return {}
 
 
-def build_config(args):
-    """Merge config-file values with CLI overrides. CLI always wins."""
-    cfg = load_config(args.config)
-
-    # CLI overrides — only applied when explicitly supplied
-    if args.state:
-        cfg["state"] = args.state
-    if args.prospect_type:
-        cfg["prospect_type"] = args.prospect_type
-    if args.counties:
-        cfg["counties"] = [c.strip() for c in args.counties.split(",") if c.strip()]
-    if args.auction_start_date:
-        cfg["auction_start_date"] = args.auction_start_date
-    if args.auction_end_date:
-        cfg["auction_end_date"] = args.auction_end_date
-    if args.case_numbers:
-        cfg["case_numbers"] = [x.strip() for x in args.case_numbers.split(",") if x.strip()]
-    if args.skip_completed:
-        cfg["skip_completed"] = True
-    if args.no_retry_failed:
-        cfg["retry_failed"] = False
-    if args.dry_run:
-        cfg["dry_run"] = True
-    if args.headless:
-        cfg["headless"] = True
-
-    return cfg
+def build_config(options):
+    """Load config from the JSON file specified by --config."""
+    return load_config(options["config"])
 
 
 # ---------------------------------------------------------------------------
@@ -125,27 +89,22 @@ def get_qualified_prospects(cfg):
         .select_related("county", "county__state")
     )
 
-    # Specific case numbers
     case_numbers = cfg.get("case_numbers") or []
     if case_numbers:
         qs = qs.filter(case_number__in=case_numbers)
 
-    # State abbreviation (e.g. "FL")
     state = (cfg.get("state") or "").strip().upper()
     if state:
         qs = qs.filter(county__state__abbreviation=state)
 
-    # Prospect type (e.g. "TD", "TL", "TP")
     prospect_type = (cfg.get("prospect_type") or "").strip().upper()
     if prospect_type:
         qs = qs.filter(prospect_type=prospect_type)
 
-    # County names
     counties = cfg.get("counties") or []
     if counties:
         qs = qs.filter(county__name__in=counties)
 
-    # Auction date range
     auction_start = (cfg.get("auction_start_date") or "").strip()
     if auction_start:
         try:
@@ -162,7 +121,6 @@ def get_qualified_prospects(cfg):
         except ValueError:
             print(f"Warning: invalid auction_end_date '{auction_end}' (expected YYYY-MM-DD), ignoring.")
 
-    # skip_completed: exclude prospects that have no pending auto-download docs
     if cfg.get("skip_completed"):
         qs = qs.filter(
             tdm_documents__is_auto_download=True,
@@ -186,7 +144,6 @@ def _download_pending(page, context, prospect, case_id, cfg):
         is_auto_download=True,
         is_downloaded=False,
     )
-    # When retry_failed is False, skip docs that already have a download error
     if not retry_failed:
         pending_filter["download_error"] = ""
 
@@ -217,7 +174,6 @@ def _download_pending(page, context, prospect, case_id, cfg):
             fname += ".pdf"
         dest = dest_dir / fname
 
-        # Already on disk from a previous run — just mark it
         if dest.exists():
             tdm_doc.is_downloaded = True
             tdm_doc.downloaded_at = datetime.now()
@@ -296,7 +252,6 @@ def sync_prospect(page, context, prospect, cfg):
     tag = "[DRY RUN] " if dry_run else ""
     print(f"\n[{prospect.case_number}] {tag}Syncing TDM documents...")
 
-    # 1. Scrape
     result = scrape_case_documents(page, prospect.case_number)
     if "error" in result:
         print(f"  [{prospect.case_number}] Scrape error: {result['error']}")
@@ -306,7 +261,6 @@ def sync_prospect(page, context, prospect, cfg):
     scraped_docs = result.get("documents", [])
     print(f"  [{prospect.case_number}] TDM returned {len(scraped_docs)} document(s).")
 
-    # 2. Detect new documents (compare by document_id)
     existing_ids = set(
         ProspectTDMDocument.objects.filter(prospect=prospect)
         .values_list("document_id", flat=True)
@@ -316,7 +270,6 @@ def sync_prospect(page, context, prospect, cfg):
         if d.get("document_id") and d["document_id"] not in existing_ids
     ]
 
-    # 3. Dry-run: just report what would happen
     if dry_run:
         if new_docs:
             for doc in new_docs:
@@ -328,7 +281,6 @@ def sync_prospect(page, context, prospect, cfg):
         _download_pending(page, context, prospect, case_id, cfg)
         return
 
-    # 4. Persist new documents
     for doc in new_docs:
         needs_download = any(kw in doc.get("title", "") for kw in DOWNLOAD_TITLES)
         ProspectTDMDocument.objects.create(
@@ -343,7 +295,6 @@ def sync_prospect(page, context, prospect, cfg):
             is_auto_download=needs_download,
         )
 
-    # 5. Log and note if new docs were found
     if new_docs:
         titles_str = ", ".join(d.get("title", "") for d in new_docs)
         desc = f"TDM sync: {len(new_docs)} new document(s) found \u2014 {titles_str}"
@@ -366,102 +317,65 @@ def sync_prospect(page, context, prospect, cfg):
     else:
         print(f"  [{prospect.case_number}] No new documents.")
 
-    # 6. Download eligible docs that haven't been downloaded yet
     _download_pending(page, context, prospect, case_id, cfg)
 
 
 # ---------------------------------------------------------------------------
-# CLI
+# Command
 # ---------------------------------------------------------------------------
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Sync TDM documents for all qualified prospects.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=(
-            "Filter examples:\n"
-            "  --state FL\n"
-            "  --prospect-type TD\n"
-            "  --counties \"Miami-Dade,Broward\"\n"
-            "  --auction-start-date 2025-01-01 --auction-end-date 2025-06-30\n"
-            "  --case-numbers 2025A00886,2025A00123\n"
-            "  --dry-run\n"
-        ),
-    )
-    parser.add_argument(
-        "--config",
-        default=str(DEFAULT_CONFIG_PATH),
-        metavar="PATH",
-        help="Path to JSON config file (default: apps/scraper/config/sync_config.json)",
-    )
-    # Filters
-    parser.add_argument("--state", help="Filter by state abbreviation, e.g. FL")
-    parser.add_argument("--prospect-type", dest="prospect_type", help="Filter by prospect type, e.g. TD, TL, TP")
-    parser.add_argument("--counties", help="Comma-separated county names to include")
-    parser.add_argument("--auction-start-date", dest="auction_start_date", metavar="YYYY-MM-DD",
-                        help="Include only prospects with auction_date >= this date")
-    parser.add_argument("--auction-end-date", dest="auction_end_date", metavar="YYYY-MM-DD",
-                        help="Include only prospects with auction_date <= this date")
-    parser.add_argument("--case-numbers", dest="case_numbers",
-                        help="Comma-separated case numbers to sync, e.g. 2025A00886,2025A00123")
-    # Behaviour
-    parser.add_argument("--skip-completed", dest="skip_completed", action="store_true", default=False,
-                        help="Skip prospects that have no pending auto-downloads")
-    parser.add_argument("--no-retry-failed", dest="no_retry_failed", action="store_true", default=False,
-                        help="Do not retry documents that previously failed to download")
-    parser.add_argument("--dry-run", dest="dry_run", action="store_true", default=False,
-                        help="Report actions without writing to DB or saving files")
-    parser.add_argument("--headless", action="store_true", default=False,
-                        help="Run browser in headless mode (default: visible)")
-    return parser.parse_args()
+class Command(BaseCommand):
+    help = "Sync TDM documents for all qualified prospects."
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--config",
+            default=str(DEFAULT_CONFIG_PATH),
+            metavar="PATH",
+            help="Path to JSON config file (default: apps/scraper/config/sync_config.json)",
+        )
 
-def main():
-    args = parse_args()
-    cfg = build_config(args)
+    def handle(self, *args, **options):
+        cfg = build_config(options)
 
-    dry_run = cfg.get("dry_run", False)
-    headless = cfg.get("headless", False)
+        dry_run = cfg.get("dry_run", False)
+        headless = cfg.get("headless", False)
 
-    if dry_run:
-        print("=== DRY RUN MODE — no DB writes or file saves ===")
+        if dry_run:
+            self.stdout.write(self.style.WARNING("=== DRY RUN MODE — no DB writes or file saves ==="))
 
-    # Summarise active filters
-    filters = []
-    if cfg.get("state"):              filters.append(f"state={cfg['state']}")
-    if cfg.get("prospect_type"):      filters.append(f"type={cfg['prospect_type']}")
-    if cfg.get("counties"):           filters.append(f"counties={cfg['counties']}")
-    if cfg.get("auction_start_date"): filters.append(f"auction>={cfg['auction_start_date']}")
-    if cfg.get("auction_end_date"):   filters.append(f"auction<={cfg['auction_end_date']}")
-    if cfg.get("case_numbers"):       filters.append(f"case_numbers={cfg['case_numbers']}")
-    if cfg.get("skip_completed"):     filters.append("skip_completed=True")
-    if not cfg.get("retry_failed", True): filters.append("retry_failed=False")
-    if filters:
-        print(f"Active filters: {', '.join(filters)}")
+        # Summarise active filters
+        filters = []
+        if cfg.get("state"):              filters.append(f"state={cfg['state']}")
+        if cfg.get("prospect_type"):      filters.append(f"type={cfg['prospect_type']}")
+        if cfg.get("counties"):           filters.append(f"counties={cfg['counties']}")
+        if cfg.get("auction_start_date"): filters.append(f"auction>={cfg['auction_start_date']}")
+        if cfg.get("auction_end_date"):   filters.append(f"auction<={cfg['auction_end_date']}")
+        if cfg.get("case_numbers"):       filters.append(f"case_numbers={cfg['case_numbers']}")
+        if cfg.get("skip_completed"):     filters.append("skip_completed=True")
+        if not cfg.get("retry_failed", True): filters.append("retry_failed=False")
+        if filters:
+            self.stdout.write(f"Active filters: {', '.join(filters)}")
 
-    prospects = list(get_qualified_prospects(cfg))
-    print(f"Found {len(prospects)} qualified prospect(s) to sync.")
+        prospects = list(get_qualified_prospects(cfg))
+        self.stdout.write(f"Found {len(prospects)} qualified prospect(s) to sync.")
 
-    if not prospects:
-        print("Nothing to do.")
-        return
+        if not prospects:
+            self.stdout.write("Nothing to do.")
+            return
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=headless)
-        context = browser.new_context(**BROWSER_ARGS)
-        page = context.new_page()
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=headless)
+            context = browser.new_context(**BROWSER_ARGS)
+            page = context.new_page()
 
-        for prospect in prospects:
-            try:
-                sync_prospect(page, context, prospect, cfg)
-            except Exception as exc:
-                print(f"[{prospect.case_number}] Unhandled error: {exc}")
+            for prospect in prospects:
+                try:
+                    sync_prospect(page, context, prospect, cfg)
+                except Exception as exc:
+                    self.stderr.write(self.style.ERROR(f"[{prospect.case_number}] Unhandled error: {exc}"))
 
-        context.close()
-        browser.close()
+            context.close()
+            browser.close()
 
-    print("\nSync complete.")
-
-
-if __name__ == "__main__":
-    main()
+        self.stdout.write(self.style.SUCCESS("\nSync complete."))

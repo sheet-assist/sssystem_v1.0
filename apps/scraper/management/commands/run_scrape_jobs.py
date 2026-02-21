@@ -1,32 +1,67 @@
-from collections import defaultdict
+"""Management command: run ScrapeJob batches.
 
+All run parameters are read from the JSON config file
+(default: apps/scraper/config/scrape_jobs_config.json).
+Edit that file to specify which job names to run.
+An empty job_names list runs all active jobs.
+
+Usage:
+    python manage.py run_scrape_jobs
+    python manage.py run_scrape_jobs --config path/to/other_config.json
+"""
+
+import json
+from collections import defaultdict
+from pathlib import Path
+
+from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from apps.scraper.engine import run_scrape_job
 from apps.scraper.models import ScrapeJob
 
+BASE_DIR = Path(settings.BASE_DIR)
+DEFAULT_CONFIG_PATH = BASE_DIR / "apps" / "scraper" / "config" / "scrape_jobs_config.json"
+
+
+def load_config(path):
+    """Load JSON config file; return empty dict if file is missing or unreadable."""
+    p = Path(path)
+    if not p.exists():
+        return {}
+    try:
+        with open(p, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as exc:
+        print(f"Warning: could not load config file {path}: {exc}")
+        return {}
+
 
 class Command(BaseCommand):
-    help = (
-        "Run legacy ScrapeJob batches by name. "
-        "Provide one or more job names to target specific groups, "
-        "or omit names to run all active jobs."
-    )
+    help = "Run ScrapeJob batches. Job names are read from apps/scraper/config/scrape_jobs_config.json."
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "job_names",
-            nargs="*",
-            help="Optional list of job names to run. If omitted, all active jobs run.",
+            "--config",
+            default=str(DEFAULT_CONFIG_PATH),
+            metavar="PATH",
+            help="Path to JSON config file (default: apps/scraper/config/scrape_jobs_config.json)",
         )
 
     def handle(self, *args, **options):
-        job_names = [name.strip() for name in options.get("job_names", []) if name.strip()]
+        cfg = load_config(options["config"])
+        job_names = [n.strip() for n in (cfg.get("job_names") or []) if n.strip()]
+
         queryset = self._build_queryset(job_names)
 
         if not queryset.exists():
             self.stdout.write(self.style.WARNING("No matching ScrapeJobs found."))
             return
+
+        if job_names:
+            self.stdout.write(f"Running jobs: {', '.join(job_names)}")
+        else:
+            self.stdout.write("Running all active jobs.")
 
         jobs_by_name = defaultdict(list)
         for job in queryset:
@@ -51,13 +86,11 @@ class Command(BaseCommand):
 
                 self._reset_if_needed(job)
 
-                self.stdout.write(
-                    f"- Executing job #{job.pk} for {job.county.name}"
-                )
+                self.stdout.write(f"- Executing job #{job.pk} for {job.county.name}")
                 try:
                     run_scrape_job(job)
                     started += 1
-                except Exception as exc:  # pragma: no cover - surface errors in CLI output
+                except Exception as exc:
                     skipped += 1
                     job.refresh_from_db()
                     job.status = "failed"
