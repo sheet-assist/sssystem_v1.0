@@ -1,0 +1,7 @@
+# Django Settings
+DEBUG=True
+SECRET_KEY=*@7ra@w^rze@p00hn0u54d)tw7r^cjc&rj8z5u&1ikvoq067@1
+ALLOWED_HOSTS=localhost,127.0.0.1,127.0.0.1:8000
+
+# Email Configuration
+EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
