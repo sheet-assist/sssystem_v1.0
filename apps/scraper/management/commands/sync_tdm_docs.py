@@ -5,7 +5,7 @@ detects new documents, persists metadata to the DB, logs audit events, and
 auto-downloads Surplus Claim/Affidavit, COM_SURPLUS, and SURPLUS_LETTER PDFs.
 
 All run parameters are read from the JSON config file (default: apps/scraper/config/sync_config.json).
-Edit that file to change filters, headless mode, dry-run, etc.
+Edit that file to change filters, headless mode, dry-run, output_file, etc.
 
 Usage:
     python manage.py sync_tdm_docs
@@ -19,6 +19,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 from apps.prospects.models import (
@@ -43,6 +44,7 @@ DOWNLOAD_TITLES = {"Surplus Claim/Affidavit", "COM_SURPLUS", "SURPLUS_LETTER"}
 BASE_DIR = Path(settings.BASE_DIR)
 MEDIA_ROOT = Path(getattr(settings, "MEDIA_ROOT", BASE_DIR / "media"))
 DEFAULT_CONFIG_PATH = BASE_DIR / "apps" / "scraper" / "config" / "sync_config.json"
+DEFAULT_OUTPUT_PATH = BASE_DIR / "apps" / "scraper" / "config" / "tdm_sync_output.md"
 
 BROWSER_ARGS = dict(
     viewport={"width": 1280, "height": 900},
@@ -75,6 +77,100 @@ def load_config(path):
 def build_config(options):
     """Load config from the JSON file specified by --config."""
     return load_config(options["config"])
+
+
+def resolve_output_path(cfg, config_path):
+    """Resolve the markdown output path from config or fall back to default."""
+    raw = (cfg.get("output_file") or "").strip()
+    if not raw:
+        return DEFAULT_OUTPUT_PATH
+    p = Path(raw)
+    if not p.is_absolute():
+        p = (Path(config_path).parent / p).resolve()
+    return p
+
+
+# ---------------------------------------------------------------------------
+# Progress report helpers
+# ---------------------------------------------------------------------------
+
+def _fmt_dt(value):
+    if not value:
+        return ""
+    if hasattr(value, "strftime"):
+        try:
+            return timezone.localtime(value).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return value.strftime("%Y-%m-%d %H:%M:%S")
+    return str(value)
+
+
+def _append_event(progress, message):
+    now_text = _fmt_dt(timezone.now())
+    progress["events"].append(f"{now_text} — {message}")
+    if len(progress["events"]) > 200:
+        progress["events"] = progress["events"][-200:]
+
+
+def _write_progress(output_path, progress):
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    s = progress["stats"]
+    lines = []
+
+    lines.append("# TDM Document Sync Progress")
+    lines.append("")
+
+    # ── Run metadata ──────────────────────────────────────────────────────
+    lines.append("## Run")
+    lines.append(f"- Started: {_fmt_dt(progress['run_started'])}")
+    lines.append(f"- Finished: {_fmt_dt(progress['run_finished']) if progress['run_finished'] else '-'}")
+    lines.append(f"- Config: `{progress['config_path']}`")
+    lines.append(f"- Output: `{progress['output_path']}`")
+    lines.append(f"- Dry Run: `{progress['dry_run']}`")
+    if progress["filters"]:
+        lines.append(f"- Filters: `{', '.join(progress['filters'])}`")
+    lines.append("")
+
+    # ── Current ───────────────────────────────────────────────────────────
+    lines.append("## Current")
+    lines.append(f"- Processing: {progress['current'] or '-'}")
+    lines.append("")
+
+    # ── Stats ─────────────────────────────────────────────────────────────
+    lines.append("## Stats")
+    lines.append(f"- Total Prospects: `{progress['total_prospects']}`")
+    lines.append(f"- Processed: `{s['processed']}`")
+    lines.append(f"- New Docs Found: `{s['new_docs_found']}`")
+    lines.append(f"- Docs Downloaded: `{s['docs_downloaded']}`")
+    lines.append(f"- Download Errors: `{s['download_errors']}`")
+    lines.append(f"- Scrape Errors: `{s['scrape_errors']}`")
+    lines.append("")
+
+    # ── Prospect rows ─────────────────────────────────────────────────────
+    lines.append("## Prospects")
+    lines.append(
+        "| # | Case Number | County | State | Status | Scraped | New | Downloaded | DL Errors | Error |"
+    )
+    lines.append("|---|---|---|---|---|---:|---:|---:|---:|---|")
+    for row in progress["rows"]:
+        scraped  = str(row["scraped"])  if row["scraped"]  is not None else "-"
+        new_docs = str(row["new_docs"]) if row["new_docs"] is not None else "-"
+        dl       = str(row["downloaded"])     if row["downloaded"]     is not None else "-"
+        dl_err   = str(row["download_errors"]) if row["download_errors"] is not None else "-"
+        error    = (row["error"] or "-").replace("|", "\\|").replace("\n", " ").strip()
+        lines.append(
+            f"| {row['index']} | {row['case_number']} | {row['county']} | {row['state']} "
+            f"| {row['status']} | {scraped} | {new_docs} | {dl} | {dl_err} | {error} |"
+        )
+    lines.append("")
+
+    # ── Event log ─────────────────────────────────────────────────────────
+    lines.append("## Event Log")
+    for event in progress["events"][-100:]:
+        lines.append(f"- {event}")
+    lines.append("")
+
+    output_path.write_text("\n".join(lines), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -131,11 +227,11 @@ def get_qualified_prospects(cfg):
 
 
 # ---------------------------------------------------------------------------
-# Download helper
+# Download helper  — returns (downloaded_count, error_count)
 # ---------------------------------------------------------------------------
 
 def _download_pending(page, context, prospect, case_id, cfg):
-    """Download any eligible docs not yet on disk for *prospect*."""
+    """Download any eligible docs not yet on disk. Returns (downloaded, errors)."""
     retry_failed = cfg.get("retry_failed", True)
     dry_run = cfg.get("dry_run", False)
 
@@ -149,21 +245,24 @@ def _download_pending(page, context, prospect, case_id, cfg):
 
     pending = ProspectTDMDocument.objects.filter(**pending_filter)
     if not pending.exists():
-        return
+        return 0, 0
 
+    downloaded = 0
+    errors = 0
     print(f"  [{prospect.case_number}] {pending.count()} pending download(s).")
 
     if dry_run:
         for tdm_doc in pending:
             print(f"  [{prospect.case_number}] [DRY RUN] Would download: {tdm_doc.title}")
-        return
+        return 0, 0
 
     if not navigate_to_documents_tab(page, prospect.case_number, case_id):
         print(f"  [{prospect.case_number}] Could not navigate to Documents tab for downloads.")
         for tdm_doc in pending:
             tdm_doc.download_error = "Navigation to Documents tab failed"
             tdm_doc.save(update_fields=["download_error", "last_checked_at"])
-        return
+            errors += 1
+        return downloaded, errors
 
     dest_dir = MEDIA_ROOT / "prospects" / str(prospect.pk) / "tdm"
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -181,6 +280,7 @@ def _download_pending(page, context, prospect, case_id, cfg):
             tdm_doc.download_error = ""
             tdm_doc.save(update_fields=["is_downloaded", "downloaded_at", "local_path", "download_error", "last_checked_at"])
             print(f"  [{prospect.case_number}] Already on disk: {fname}")
+            downloaded += 1
             continue
 
         try:
@@ -218,6 +318,7 @@ def _download_pending(page, context, prospect, case_id, cfg):
                 tdm_doc.download_error = "No PDF URL captured"
                 tdm_doc.save(update_fields=["download_error", "last_checked_at"])
                 print(f"  [{prospect.case_number}] No PDF URL for document_id={tdm_doc.document_id}")
+                errors += 1
                 continue
 
             api_resp = context.request.get(pdf_url, timeout=30_000)
@@ -229,38 +330,47 @@ def _download_pending(page, context, prospect, case_id, cfg):
                 tdm_doc.download_error = ""
                 tdm_doc.save(update_fields=["is_downloaded", "downloaded_at", "local_path", "download_error", "last_checked_at"])
                 print(f"  [{prospect.case_number}] Saved: {fname}")
+                downloaded += 1
             else:
                 tdm_doc.download_error = f"HTTP {api_resp.status}"
                 tdm_doc.save(update_fields=["download_error", "last_checked_at"])
                 print(f"  [{prospect.case_number}] HTTP {api_resp.status} for {fname}")
+                errors += 1
 
         except Exception as exc:
             tdm_doc.download_error = str(exc)
             tdm_doc.save(update_fields=["download_error", "last_checked_at"])
             print(f"  [{prospect.case_number}] Download error: {exc}")
+            errors += 1
 
         time.sleep(1)
 
+    return downloaded, errors
+
 
 # ---------------------------------------------------------------------------
-# Per-prospect sync
+# Per-prospect sync  — returns result dict for progress tracking
 # ---------------------------------------------------------------------------
 
 def sync_prospect(page, context, prospect, cfg):
-    """Scrape, diff, persist, notify, and download for a single prospect."""
+    """Scrape, diff, persist, notify, and download. Returns a result dict."""
     dry_run = cfg.get("dry_run", False)
     tag = "[DRY RUN] " if dry_run else ""
     print(f"\n[{prospect.case_number}] {tag}Syncing TDM documents...")
 
+    # 1. Scrape
     result = scrape_case_documents(page, prospect.case_number)
     if "error" in result:
-        print(f"  [{prospect.case_number}] Scrape error: {result['error']}")
-        return
+        msg = result["error"]
+        print(f"  [{prospect.case_number}] Scrape error: {msg}")
+        return {"status": "scrape_error", "scraped": 0, "new_docs": 0,
+                "downloaded": 0, "download_errors": 0, "error": msg}
 
     case_id = result.get("case_id", "")
     scraped_docs = result.get("documents", [])
     print(f"  [{prospect.case_number}] TDM returned {len(scraped_docs)} document(s).")
 
+    # 2. Detect new documents
     existing_ids = set(
         ProspectTDMDocument.objects.filter(prospect=prospect)
         .values_list("document_id", flat=True)
@@ -270,6 +380,7 @@ def sync_prospect(page, context, prospect, cfg):
         if d.get("document_id") and d["document_id"] not in existing_ids
     ]
 
+    # 3. Dry-run path
     if dry_run:
         if new_docs:
             for doc in new_docs:
@@ -278,9 +389,11 @@ def sync_prospect(page, context, prospect, cfg):
                 print(f"  [{prospect.case_number}] [DRY RUN] Would create: {doc.get('title', '?')}{dl_flag}")
         else:
             print(f"  [{prospect.case_number}] No new documents.")
-        _download_pending(page, context, prospect, case_id, cfg)
-        return
+        dl, dl_err = _download_pending(page, context, prospect, case_id, cfg)
+        return {"status": "dry-run", "scraped": len(scraped_docs), "new_docs": len(new_docs),
+                "downloaded": dl, "download_errors": dl_err, "error": ""}
 
+    # 4. Persist new documents
     for doc in new_docs:
         needs_download = any(kw in doc.get("title", "") for kw in DOWNLOAD_TITLES)
         ProspectTDMDocument.objects.create(
@@ -295,6 +408,7 @@ def sync_prospect(page, context, prospect, cfg):
             is_auto_download=needs_download,
         )
 
+    # 5. Log and note if new docs found
     if new_docs:
         titles_str = ", ".join(d.get("title", "") for d in new_docs)
         desc = f"TDM sync: {len(new_docs)} new document(s) found \u2014 {titles_str}"
@@ -317,7 +431,17 @@ def sync_prospect(page, context, prospect, cfg):
     else:
         print(f"  [{prospect.case_number}] No new documents.")
 
-    _download_pending(page, context, prospect, case_id, cfg)
+    # 6. Download
+    dl, dl_err = _download_pending(page, context, prospect, case_id, cfg)
+
+    return {
+        "status": "completed",
+        "scraped": len(scraped_docs),
+        "new_docs": len(new_docs),
+        "downloaded": dl,
+        "download_errors": dl_err,
+        "error": "",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -336,7 +460,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        config_path = options["config"]
         cfg = build_config(options)
+        output_path = resolve_output_path(cfg, config_path)
 
         dry_run = cfg.get("dry_run", False)
         headless = cfg.get("headless", False)
@@ -344,7 +470,7 @@ class Command(BaseCommand):
         if dry_run:
             self.stdout.write(self.style.WARNING("=== DRY RUN MODE — no DB writes or file saves ==="))
 
-        # Summarise active filters
+        # Active filter summary
         filters = []
         if cfg.get("state"):              filters.append(f"state={cfg['state']}")
         if cfg.get("prospect_type"):      filters.append(f"type={cfg['prospect_type']}")
@@ -360,22 +486,112 @@ class Command(BaseCommand):
         prospects = list(get_qualified_prospects(cfg))
         self.stdout.write(f"Found {len(prospects)} qualified prospect(s) to sync.")
 
+        # Initialise progress
+        progress = {
+            "run_started": timezone.now(),
+            "run_finished": None,
+            "config_path": str(config_path),
+            "output_path": str(output_path),
+            "dry_run": dry_run,
+            "filters": filters,
+            "total_prospects": len(prospects),
+            "current": "",
+            "stats": {
+                "processed": 0,
+                "new_docs_found": 0,
+                "docs_downloaded": 0,
+                "download_errors": 0,
+                "scrape_errors": 0,
+            },
+            "rows": [],
+            "events": [],
+        }
+        _append_event(progress, f"Started sync for {len(prospects)} prospect(s).")
+        _write_progress(output_path, progress)
+
         if not prospects:
+            progress["run_finished"] = timezone.now()
+            _append_event(progress, "Nothing to do.")
+            _write_progress(output_path, progress)
             self.stdout.write("Nothing to do.")
             return
+
+        self.stdout.write(f"Progress report: {output_path}")
 
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=headless)
             context = browser.new_context(**BROWSER_ARGS)
             page = context.new_page()
 
-            for prospect in prospects:
+            for index, prospect in enumerate(prospects, start=1):
+                label = f"[{index}/{len(prospects)}] {prospect.case_number}"
+                progress["current"] = label
+                _append_event(progress, f"Processing {prospect.case_number} ({prospect.county})")
+
+                row = {
+                    "index": index,
+                    "case_number": prospect.case_number,
+                    "county": prospect.county.name,
+                    "state": prospect.county.state.abbreviation,
+                    "status": "running",
+                    "scraped": None,
+                    "new_docs": None,
+                    "downloaded": None,
+                    "download_errors": None,
+                    "error": "",
+                }
+                progress["rows"].append(row)
+                _write_progress(output_path, progress)
+
                 try:
-                    sync_prospect(page, context, prospect, cfg)
+                    res = sync_prospect(page, context, prospect, cfg)
+
+                    row["status"]         = res["status"]
+                    row["scraped"]        = res["scraped"]
+                    row["new_docs"]       = res["new_docs"]
+                    row["downloaded"]     = res["downloaded"]
+                    row["download_errors"] = res["download_errors"]
+                    row["error"]          = res.get("error", "")
+
+                    s = progress["stats"]
+                    s["processed"]       += 1
+                    s["new_docs_found"]  += res["new_docs"]
+                    s["docs_downloaded"] += res["downloaded"]
+                    s["download_errors"] += res["download_errors"]
+                    if res["status"] == "scrape_error":
+                        s["scrape_errors"] += 1
+
+                    _append_event(
+                        progress,
+                        f"[{prospect.case_number}] scraped={res['scraped']} new={res['new_docs']} "
+                        f"downloaded={res['downloaded']} dl_errors={res['download_errors']}"
+                    )
+
                 except Exception as exc:
+                    row["status"] = "error"
+                    row["error"]  = str(exc)
+                    progress["stats"]["scrape_errors"] += 1
+                    _append_event(progress, f"[{prospect.case_number}] Unhandled error: {exc}")
                     self.stderr.write(self.style.ERROR(f"[{prospect.case_number}] Unhandled error: {exc}"))
+
+                _write_progress(output_path, progress)
 
             context.close()
             browser.close()
 
-        self.stdout.write(self.style.SUCCESS("\nSync complete."))
+        progress["current"] = ""
+        progress["run_finished"] = timezone.now()
+        s = progress["stats"]
+        _append_event(
+            progress,
+            f"Sync complete. processed={s['processed']} new_docs={s['new_docs_found']} "
+            f"downloaded={s['docs_downloaded']} dl_errors={s['download_errors']} "
+            f"scrape_errors={s['scrape_errors']}"
+        )
+        _write_progress(output_path, progress)
+
+        self.stdout.write(self.style.SUCCESS(
+            f"Sync complete. processed={s['processed']} new_docs={s['new_docs_found']} "
+            f"downloaded={s['docs_downloaded']} dl_errors={s['download_errors']} "
+            f"scrape_errors={s['scrape_errors']}"
+        ))

@@ -5,8 +5,13 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
+
+BASE_DIR = Path(settings.BASE_DIR)
+DEFAULT_CONFIG_PATH = BASE_DIR / "apps" / "scraper" / "config" / "scrape_config.js"
+DEFAULT_OUTPUT_PATH = BASE_DIR / "apps" / "scraper" / "config" / "output.md"
 
 from apps.locations.models import County, State
 from apps.scraper.engine import run_scrape_job
@@ -32,8 +37,8 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--config",
-            default="scrape_config.js",
-            help="Path to scrape config file (default: scrape_config.js).",
+            default=str(DEFAULT_CONFIG_PATH),
+            help="Path to scrape config file (default: apps/scraper/config/scrape_config.js).",
         )
         parser.add_argument(
             "--output",
@@ -45,13 +50,8 @@ class Command(BaseCommand):
         config_path = Path(options["config"]).resolve()
         config = self._load_config(config_path)
         output_file_cfg = (config.get("output_file") or "").strip()
-        if not output_file_cfg and not options.get("output"):
-            raise CommandError(
-                "Config requires 'output_file' (example: \"output.md\"), "
-                "or pass --output."
-            )
         output_path = self._resolve_output_path(
-            options.get("output"), output_file_cfg or "output.md", config_path
+            options.get("output"), output_file_cfg, config_path
         )
 
         state = self._resolve_state(config)
@@ -252,7 +252,7 @@ class Command(BaseCommand):
         return parsed
 
     def _resolve_output_path(self, output_arg: Optional[str], output_cfg: str, config_path: Path) -> Path:
-        raw_path = output_arg or output_cfg or "output.md"
+        raw_path = output_arg or output_cfg or str(DEFAULT_OUTPUT_PATH)
         path = Path(raw_path)
         if not path.is_absolute():
             path = (config_path.parent / path).resolve()

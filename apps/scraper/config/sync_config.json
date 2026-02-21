@@ -8,5 +8,6 @@
   "skip_completed": false,
   "retry_failed": true,
   "dry_run": false,
-  "headless": true
+  "headless": true,
+  "output_file": "tdm_sync_output.md"
 }
