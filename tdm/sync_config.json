@@ -1,0 +1,12 @@
+{
+  "state": "",
+  "prospect_type": "",
+  "counties": [],
+  "auction_start_date": "",
+  "auction_end_date": "",
+  "case_numbers": [],
+  "skip_completed": false,
+  "retry_failed": true,
+  "dry_run": false,
+  "headless": true
+}

@@ -332,6 +332,27 @@
       </div>
     </div>
 
+    {# TDM Documents Card #}
+    {% if tdm_downloaded_docs %}
+    <div class="card mb-3">
+      <div class="card-header fw-semibold py-2 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-file-earmark-check me-1"></i> TDM Documents</span>
+        {% if tdm_last_sync %}<small class="text-muted fw-normal" style="font-size:.75rem;">Synced {{ tdm_last_sync|date:"m/d/Y H:i" }}</small>{% endif %}
+      </div>
+      <ul class="list-group list-group-flush">
+        {% for doc in tdm_downloaded_docs %}
+        <li class="list-group-item py-1 px-3 small">
+          <a href="{% url 'prospects:tdm_document_open' object.pk doc.pk %}" target="_blank" rel="noopener"
+             class="fw-medium link-primary link-underline-opacity-0 link-underline-opacity-100-hover">
+            <i class="bi bi-file-earmark-pdf me-1 text-danger"></i>{{ doc.title }}
+          </a>
+          <div class="text-muted" style="font-size:.78rem;">{{ doc.downloaded_at|date:"m/d/Y H:i" }}</div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
   </div>
 </div>{# /inner row #}
 

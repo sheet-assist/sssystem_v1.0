@@ -24,7 +24,7 @@ from apps.settings_app.models import SSRevenueSetting
 
 from .filters import ProspectFilter
 from .forms import AssignProspectForm, ProspectNoteForm, ResearchForm, WorkflowTransitionForm
-from .models import Prospect, ProspectNote, log_prospect_action
+from .models import Prospect, ProspectNote, ProspectTDMDocument, log_prospect_action
 from django.views.generic import FormView
 from django.shortcuts import render
 
@@ -521,7 +521,15 @@ class ProspectDetailView(ProspectsAccessMixin, DetailView):
             "notes__author",
             "action_logs__user",
             "rule_notes__created_by",
+            "tdm_documents",
         )
+
+    def get_context_data(self, **kwargs):
+        from django.db.models import Max
+        ctx = super().get_context_data(**kwargs)
+        ctx["tdm_downloaded_docs"] = self.object.tdm_documents.filter(is_downloaded=True)
+        ctx["tdm_last_sync"] = self.object.tdm_documents.aggregate(Max("last_checked_at"))["last_checked_at__max"]
+        return ctx
 
 
 # -------------------- Digital Folder endpoints --------------------
@@ -549,7 +557,15 @@ class ProspectDocumentsPageV2View(ProspectsAccessMixin, DetailView):
     template_name = 'prospects/documents_page_v2.html'
 
     def get_queryset(self):
-        return Prospect.objects.select_related('county', 'county__state').prefetch_related('documents__uploaded_by', 'documents__notes__created_by')
+        return Prospect.objects.select_related('county', 'county__state').prefetch_related(
+            'documents__uploaded_by', 'documents__notes__created_by', 'tdm_documents'
+        )
+
+    def get_context_data(self, **kwargs):
+        from django.db.models import Max
+        ctx = super().get_context_data(**kwargs)
+        ctx["tdm_last_sync"] = self.object.tdm_documents.aggregate(Max("last_checked_at"))["last_checked_at__max"]
+        return ctx
 
 
 @login_required
@@ -661,6 +677,29 @@ def prospect_document_download(request, pk, doc_pk):
         return FileResponse(fh, as_attachment=True, filename=doc.filename())
     except Exception:
         return HttpResponse(status=404)
+
+
+@login_required
+@require_http_methods(["GET"])
+def prospect_tdm_document_open(request, pk, tdm_doc_pk):
+    """Serve a downloaded TDM document inline (opens in browser tab)."""
+    from pathlib import Path
+    from django.conf import settings as django_settings
+    prospect = get_object_or_404(Prospect, pk=pk)
+    if not (request.user.profile.can_view_prospects or request.user.profile.is_admin):
+        return HttpResponseForbidden()
+    tdm_doc = get_object_or_404(ProspectTDMDocument, pk=tdm_doc_pk, prospect=prospect)
+    if not tdm_doc.is_downloaded or not tdm_doc.local_path:
+        return HttpResponse("File not downloaded yet.", status=404)
+    base_dir = Path(django_settings.BASE_DIR) if hasattr(django_settings, 'BASE_DIR') else Path(__file__).resolve().parent.parent.parent
+    file_path = base_dir / tdm_doc.local_path
+    if not file_path.exists():
+        return HttpResponse("File not found on disk.", status=404)
+    try:
+        fname = file_path.name
+        return FileResponse(open(file_path, 'rb'), content_type='application/pdf', filename=fname)
+    except Exception:
+        return HttpResponse(status=500)
 
 # ------------------------------------------------------------------
 

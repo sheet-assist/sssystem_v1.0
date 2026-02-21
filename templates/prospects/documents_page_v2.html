@@ -18,13 +18,91 @@
   </div>
 </div>
 
-<div class="card">
+<div class="card mb-3">
   <div class="card-body">
     <div id="documentsPageRootV2" data-prospect-pk="{{ object.pk }}">
       {% include 'prospects/_documents_content_v2.html' with docs=object.documents.all object=object %}
     </div>
   </div>
 </div>
+
+{% with all_tdm=object.tdm_documents.all %}
+{% if all_tdm %}
+<div class="card">
+  <div class="card-header fw-semibold py-2 d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-cloud-download me-1"></i> TDM Auto-Sync Documents <span class="badge bg-secondary ms-1">{{ all_tdm|length }}</span></span>
+    {% if tdm_last_sync %}<small class="text-muted fw-normal" style="font-size:.75rem;">Last synced {{ tdm_last_sync|date:"m/d/Y H:i" }}</small>{% endif %}
+  </div>
+  <div class="card-body p-0">
+
+    {# Downloaded documents — always visible #}
+    <ul class="list-group list-group-flush">
+      {% for doc in all_tdm %}
+      {% if doc.is_downloaded %}
+      <li class="list-group-item py-2 px-3">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <a href="{% url 'prospects:tdm_document_open' object.pk doc.pk %}" target="_blank" rel="noopener"
+               class="fw-medium small link-primary link-underline-opacity-0 link-underline-opacity-100-hover">
+              <i class="bi bi-file-earmark-pdf me-1 text-danger"></i>{{ doc.title }}
+            </a>
+            {% if doc.filename %}<div class="text-muted" style="font-size:.78rem;">{{ doc.filename }}</div>{% endif %}
+          </div>
+          <div class="text-end text-nowrap ms-3">
+            <span class="badge bg-success mb-1">Downloaded</span>
+            <div class="text-muted" style="font-size:.75rem;">{{ doc.downloaded_at|date:"m/d/Y H:i" }}</div>
+          </div>
+        </div>
+      </li>
+      {% endif %}
+      {% endfor %}
+    </ul>
+
+    {# Not-downloaded documents — collapsed #}
+    <div class="accordion accordion-flush" id="tdmPendingAccordion">
+      <div class="accordion-item border-0">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed py-2 px-3 small text-muted bg-light" type="button"
+                  data-bs-toggle="collapse" data-bs-target="#tdmPendingList" aria-expanded="false">
+            <i class="bi bi-hourglass-split me-2"></i> Not yet downloaded
+          </button>
+        </h2>
+        <div id="tdmPendingList" class="accordion-collapse collapse">
+          <ul class="list-group list-group-flush">
+            {% for doc in all_tdm %}
+            {% if not doc.is_downloaded %}
+            <li class="list-group-item py-2 px-3 small">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <div class="fw-medium">{{ doc.title }}</div>
+                  {% if doc.filename %}<div class="text-muted" style="font-size:.78rem;">{{ doc.filename }}</div>{% endif %}
+                  <div class="text-muted" style="font-size:.75rem;">TDM date: {{ doc.doc_date|default:"-" }}</div>
+                </div>
+                <div class="text-end ms-3">
+                  {% if doc.is_auto_download %}
+                  <span class="badge bg-warning text-dark">Queued</span>
+                  {% else %}
+                  <span class="badge bg-light text-secondary border">Not tracked</span>
+                  {% endif %}
+                  {% if doc.download_error %}
+                  <div class="text-danger" style="font-size:.72rem;" title="{{ doc.download_error }}">
+                    <i class="bi bi-exclamation-circle"></i> Error
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            </li>
+            {% endif %}
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endif %}
+{% endwith %}
 
 <script src="{% static 'js/prospect_documents_v2.js' %}"></script>
 {% endblock %}

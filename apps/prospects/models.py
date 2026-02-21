@@ -325,6 +325,39 @@ class ProspectDocumentNote(models.Model):
         return f"Document note by {who} on {self.created_at:%Y-%m-%d %H:%M}"
 
 
+class ProspectTDMDocument(models.Model):
+    """TDM document metadata scraped daily for qualified prospects."""
+
+    prospect    = models.ForeignKey(Prospect, on_delete=models.CASCADE, related_name="tdm_documents")
+
+    # TDM-sourced metadata
+    document_id = models.CharField(max_length=50)
+    case_id     = models.CharField(max_length=50, blank=True)
+    title       = models.CharField(max_length=255)
+    filename    = models.CharField(max_length=500, blank=True)
+    details     = models.CharField(max_length=500, blank=True)
+    doc_date    = models.CharField(max_length=100, blank=True)   # e.g. "March 18, 2024"
+    doc_type    = models.CharField(max_length=50, blank=True)    # e.g. "CASE_LOG"
+
+    # Tracking
+    first_seen_at   = models.DateTimeField(auto_now_add=True)
+    last_checked_at = models.DateTimeField(auto_now=True)
+
+    # Download tracking
+    is_auto_download = models.BooleanField(default=False)   # matched a DOWNLOAD_TITLES keyword
+    is_downloaded    = models.BooleanField(default=False)
+    downloaded_at    = models.DateTimeField(null=True, blank=True)
+    local_path       = models.CharField(max_length=500, blank=True)  # relative to project BASE_DIR
+    download_error   = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = [("prospect", "document_id")]
+        ordering = ["-first_seen_at"]
+
+    def __str__(self):
+        return f"{self.prospect.case_number} \u2014 {self.title}"
+
+
 class CSVUploadLog(models.Model):
     """Record details about CSV uploads of prospects."""
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="prospect_csv_uploads")

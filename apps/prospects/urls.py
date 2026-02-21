@@ -31,6 +31,7 @@ urlpatterns = [
     path("detail/<int:pk>/documents/upload/", views.prospect_documents_upload, name="documents_upload"),
     path("detail/<int:pk>/documents/delete/", views.prospect_documents_delete, name="documents_delete"),
     path("detail/<int:pk>/documents/<int:doc_pk>/download/", views.prospect_document_download, name="document_download"),
+    path("detail/<int:pk>/tdm-documents/<int:tdm_doc_pk>/open/", views.prospect_tdm_document_open, name="tdm_document_open"),
     path("detail/<int:pk>/documents/<int:doc_pk>/notes/add/", views.prospect_document_add_note, name="document_note_add"),
     path("detail/<int:pk>/documents/<int:doc_pk>/notes/<int:note_pk>/delete/", views.prospect_document_delete_note, name="document_note_delete"),
     # Dedicated Digital Folder V2 page

@@ -75,12 +75,17 @@ class CaseDetailView(CasesAccessMixin, DetailView):
             "followups__assigned_to",
             "action_logs__user",
             "prospect__action_logs__user",
+            "prospect__tdm_documents",
         )
 
     def get_context_data(self, **kwargs):
         from apps.prospects.views import _build_lifecycle_timeline
         ctx = super().get_context_data(**kwargs)
         ctx["timeline"] = _build_lifecycle_timeline(self.object.prospect)
+        if self.object.prospect:
+            from django.db.models import Max
+            ctx["tdm_downloaded_docs"] = self.object.prospect.tdm_documents.filter(is_downloaded=True)
+            ctx["tdm_last_sync"] = self.object.prospect.tdm_documents.aggregate(Max("last_checked_at"))["last_checked_at__max"]
         return ctx
 
 
