@@ -2,7 +2,7 @@
 
 ## Run
 - Started: 2026-02-27 03:11:00
-- Finished: -
+- Finished: 2026-02-27 03:52:43
 - Config: `\\server1\D\MAP_CONFERENCE ROOM\Case Tracker\SSSystem_Main\SSSystem_V0\apps\scraper\config\scrape_config_fl_miamidade_td_2026h1.json`
 - Output: `\\server1\D\MAP_CONFERENCE ROOM\Case Tracker\SSSystem_Main\SSSystem_V0\apps\scraper\config\output_fl_miamidade_td_2026h1.md`
 - State: `FL`
@@ -13,18 +13,18 @@
 - Dry Run: `False`
 
 ## Current
-- Processing: [120/181] Miami-Dade (FL) 2026-04-30..2026-04-30
+- Processing: -
 
 ## Stats
 - Targets: `181`
-- Started Jobs: `61`
-- Completed Jobs: `60`
+- Started Jobs: `122`
+- Completed Jobs: `122`
 - Failed Jobs: `0`
 - Skipped Jobs: `59`
-- Prospects Created: `280`
+- Prospects Created: `331`
 - Prospects Updated: `31`
 - Prospects Qualified: `0`
-- Prospects Disqualified: `311`
+- Prospects Disqualified: `362`
 
 ## Job Rows
 | County | State | Start | End | Job ID | Action | Status | Start Time | End Time | Created | Updated | Qualified | Disqualified | Error |
@@ -148,106 +148,167 @@
 | Miami-Dade | FL | 2026-04-27 | 2026-04-27 | 1248 | created | completed | 2026-02-27 03:32:52 | 2026-02-27 03:33:17 | 9 | 0 | 0 | 9 | - |
 | Miami-Dade | FL | 2026-04-28 | 2026-04-28 | 1249 | created | completed | 2026-02-27 03:33:17 | 2026-02-27 03:33:29 | 7 | 0 | 0 | 7 | - |
 | Miami-Dade | FL | 2026-04-29 | 2026-04-29 | 1250 | created | completed | 2026-02-27 03:33:29 | 2026-02-27 03:33:40 | 1 | 0 | 0 | 1 | - |
-| Miami-Dade | FL | 2026-04-30 | 2026-04-30 | 1251 | created | running | 2026-02-27 03:33:40 | - | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-04-30 | 2026-04-30 | 1251 | created | completed | 2026-02-27 03:33:40 | 2026-02-27 03:34:01 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-01 | 2026-05-01 | 1252 | created | completed | 2026-02-27 03:34:01 | 2026-02-27 03:34:22 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-02 | 2026-05-02 | 1253 | created | completed | 2026-02-27 03:34:22 | 2026-02-27 03:34:43 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-03 | 2026-05-03 | 1254 | created | completed | 2026-02-27 03:34:43 | 2026-02-27 03:35:04 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-04 | 2026-05-04 | 1255 | created | completed | 2026-02-27 03:35:05 | 2026-02-27 03:35:18 | 10 | 0 | 0 | 10 | - |
+| Miami-Dade | FL | 2026-05-05 | 2026-05-05 | 1256 | created | completed | 2026-02-27 03:35:18 | 2026-02-27 03:35:30 | 2 | 0 | 0 | 2 | - |
+| Miami-Dade | FL | 2026-05-06 | 2026-05-06 | 1257 | created | completed | 2026-02-27 03:35:30 | 2026-02-27 03:35:50 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-07 | 2026-05-07 | 1258 | created | completed | 2026-02-27 03:35:51 | 2026-02-27 03:36:11 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-08 | 2026-05-08 | 1259 | created | completed | 2026-02-27 03:36:11 | 2026-02-27 03:36:33 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-09 | 2026-05-09 | 1260 | created | completed | 2026-02-27 03:36:33 | 2026-02-27 03:36:54 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-10 | 2026-05-10 | 1261 | created | completed | 2026-02-27 03:36:54 | 2026-02-27 03:37:15 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-11 | 2026-05-11 | 1262 | created | completed | 2026-02-27 03:37:15 | 2026-02-27 03:37:28 | 10 | 0 | 0 | 10 | - |
+| Miami-Dade | FL | 2026-05-12 | 2026-05-12 | 1263 | created | completed | 2026-02-27 03:37:28 | 2026-02-27 03:37:39 | 2 | 0 | 0 | 2 | - |
+| Miami-Dade | FL | 2026-05-13 | 2026-05-13 | 1264 | created | completed | 2026-02-27 03:37:40 | 2026-02-27 03:38:01 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-14 | 2026-05-14 | 1265 | created | completed | 2026-02-27 03:38:01 | 2026-02-27 03:38:22 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-15 | 2026-05-15 | 1266 | created | completed | 2026-02-27 03:38:22 | 2026-02-27 03:38:43 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-16 | 2026-05-16 | 1267 | created | completed | 2026-02-27 03:38:44 | 2026-02-27 03:39:05 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-17 | 2026-05-17 | 1268 | created | completed | 2026-02-27 03:39:05 | 2026-02-27 03:39:27 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-18 | 2026-05-18 | 1269 | created | completed | 2026-02-27 03:39:27 | 2026-02-27 03:39:39 | 4 | 0 | 0 | 4 | - |
+| Miami-Dade | FL | 2026-05-19 | 2026-05-19 | 1270 | created | completed | 2026-02-27 03:39:40 | 2026-02-27 03:39:51 | 2 | 0 | 0 | 2 | - |
+| Miami-Dade | FL | 2026-05-20 | 2026-05-20 | 1271 | created | completed | 2026-02-27 03:39:51 | 2026-02-27 03:40:03 | 3 | 0 | 0 | 3 | - |
+| Miami-Dade | FL | 2026-05-21 | 2026-05-21 | 1272 | created | completed | 2026-02-27 03:40:03 | 2026-02-27 03:40:24 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-22 | 2026-05-22 | 1273 | created | completed | 2026-02-27 03:40:24 | 2026-02-27 03:40:46 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-23 | 2026-05-23 | 1274 | created | completed | 2026-02-27 03:40:46 | 2026-02-27 03:41:06 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-24 | 2026-05-24 | 1275 | created | completed | 2026-02-27 03:41:07 | 2026-02-27 03:41:29 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-25 | 2026-05-25 | 1276 | created | completed | 2026-02-27 03:41:29 | 2026-02-27 03:41:50 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-26 | 2026-05-26 | 1277 | created | completed | 2026-02-27 03:41:50 | 2026-02-27 03:42:01 | 3 | 0 | 0 | 3 | - |
+| Miami-Dade | FL | 2026-05-27 | 2026-05-27 | 1278 | created | completed | 2026-02-27 03:42:01 | 2026-02-27 03:42:13 | 3 | 0 | 0 | 3 | - |
+| Miami-Dade | FL | 2026-05-28 | 2026-05-28 | 1279 | created | completed | 2026-02-27 03:42:13 | 2026-02-27 03:42:34 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-29 | 2026-05-29 | 1280 | created | completed | 2026-02-27 03:42:34 | 2026-02-27 03:42:55 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-30 | 2026-05-30 | 1281 | created | completed | 2026-02-27 03:42:55 | 2026-02-27 03:43:16 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-05-31 | 2026-05-31 | 1282 | created | completed | 2026-02-27 03:43:16 | 2026-02-27 03:43:37 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-01 | 2026-06-01 | 1283 | created | completed | 2026-02-27 03:43:37 | 2026-02-27 03:43:49 | 2 | 0 | 0 | 2 | - |
+| Miami-Dade | FL | 2026-06-02 | 2026-06-02 | 1284 | created | completed | 2026-02-27 03:43:49 | 2026-02-27 03:44:00 | 1 | 0 | 0 | 1 | - |
+| Miami-Dade | FL | 2026-06-03 | 2026-06-03 | 1285 | created | completed | 2026-02-27 03:44:00 | 2026-02-27 03:44:11 | 1 | 0 | 0 | 1 | - |
+| Miami-Dade | FL | 2026-06-04 | 2026-06-04 | 1286 | created | completed | 2026-02-27 03:44:12 | 2026-02-27 03:44:33 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-05 | 2026-06-05 | 1287 | created | completed | 2026-02-27 03:44:33 | 2026-02-27 03:44:54 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-06 | 2026-06-06 | 1288 | created | completed | 2026-02-27 03:44:54 | 2026-02-27 03:45:14 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-07 | 2026-06-07 | 1289 | created | completed | 2026-02-27 03:45:14 | 2026-02-27 03:45:36 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-08 | 2026-06-08 | 1290 | created | completed | 2026-02-27 03:45:36 | 2026-02-27 03:45:47 | 2 | 0 | 0 | 2 | - |
+| Miami-Dade | FL | 2026-06-09 | 2026-06-09 | 1291 | created | completed | 2026-02-27 03:45:47 | 2026-02-27 03:46:08 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-10 | 2026-06-10 | 1292 | created | completed | 2026-02-27 03:46:08 | 2026-02-27 03:46:19 | 2 | 0 | 0 | 2 | - |
+| Miami-Dade | FL | 2026-06-11 | 2026-06-11 | 1293 | created | completed | 2026-02-27 03:46:20 | 2026-02-27 03:46:40 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-12 | 2026-06-12 | 1294 | created | completed | 2026-02-27 03:46:40 | 2026-02-27 03:47:02 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-13 | 2026-06-13 | 1295 | created | completed | 2026-02-27 03:47:02 | 2026-02-27 03:47:23 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-14 | 2026-06-14 | 1296 | created | completed | 2026-02-27 03:47:23 | 2026-02-27 03:47:44 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-15 | 2026-06-15 | 1297 | created | completed | 2026-02-27 03:47:45 | 2026-02-27 03:47:56 | 1 | 0 | 0 | 1 | - |
+| Miami-Dade | FL | 2026-06-16 | 2026-06-16 | 1298 | created | completed | 2026-02-27 03:47:57 | 2026-02-27 03:48:17 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-17 | 2026-06-17 | 1299 | created | completed | 2026-02-27 03:48:17 | 2026-02-27 03:48:38 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-18 | 2026-06-18 | 1300 | created | completed | 2026-02-27 03:48:38 | 2026-02-27 03:48:59 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-19 | 2026-06-19 | 1301 | created | completed | 2026-02-27 03:49:00 | 2026-02-27 03:49:21 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-20 | 2026-06-20 | 1302 | created | completed | 2026-02-27 03:49:21 | 2026-02-27 03:49:42 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-21 | 2026-06-21 | 1303 | created | completed | 2026-02-27 03:49:42 | 2026-02-27 03:50:03 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-22 | 2026-06-22 | 1304 | created | completed | 2026-02-27 03:50:03 | 2026-02-27 03:50:15 | 1 | 0 | 0 | 1 | - |
+| Miami-Dade | FL | 2026-06-23 | 2026-06-23 | 1305 | created | completed | 2026-02-27 03:50:15 | 2026-02-27 03:50:35 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-24 | 2026-06-24 | 1306 | created | completed | 2026-02-27 03:50:36 | 2026-02-27 03:50:47 | 1 | 0 | 0 | 1 | - |
+| Miami-Dade | FL | 2026-06-25 | 2026-06-25 | 1307 | created | completed | 2026-02-27 03:50:47 | 2026-02-27 03:51:08 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-26 | 2026-06-26 | 1308 | created | completed | 2026-02-27 03:51:08 | 2026-02-27 03:51:29 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-27 | 2026-06-27 | 1309 | created | completed | 2026-02-27 03:51:29 | 2026-02-27 03:51:49 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-28 | 2026-06-28 | 1310 | created | completed | 2026-02-27 03:51:49 | 2026-02-27 03:52:11 | 0 | 0 | 0 | 0 | - |
+| Miami-Dade | FL | 2026-06-29 | 2026-06-29 | 1311 | created | completed | 2026-02-27 03:52:11 | 2026-02-27 03:52:23 | 1 | 0 | 0 | 1 | - |
+| Miami-Dade | FL | 2026-06-30 | 2026-06-30 | 1312 | created | completed | 2026-02-27 03:52:23 | 2026-02-27 03:52:43 | 0 | 0 | 0 | 0 | - |
 
 ## Event Log
-- 2026-02-27 03:14:07 - Finished Miami-Dade (FL) 2026-03-11..2026-03-11: status=completed
-- 2026-02-27 03:14:07 - Processing Miami-Dade (FL) 2026-03-12..2026-03-12
-- 2026-02-27 03:14:28 - Finished Miami-Dade (FL) 2026-03-12..2026-03-12: status=completed
-- 2026-02-27 03:14:28 - Processing Miami-Dade (FL) 2026-03-13..2026-03-13
-- 2026-02-27 03:14:49 - Finished Miami-Dade (FL) 2026-03-13..2026-03-13: status=completed
-- 2026-02-27 03:14:49 - Processing Miami-Dade (FL) 2026-03-14..2026-03-14
-- 2026-02-27 03:15:10 - Finished Miami-Dade (FL) 2026-03-14..2026-03-14: status=completed
-- 2026-02-27 03:15:10 - Processing Miami-Dade (FL) 2026-03-15..2026-03-15
-- 2026-02-27 03:15:31 - Finished Miami-Dade (FL) 2026-03-15..2026-03-15: status=completed
-- 2026-02-27 03:15:31 - Processing Miami-Dade (FL) 2026-03-16..2026-03-16
-- 2026-02-27 03:15:46 - Finished Miami-Dade (FL) 2026-03-16..2026-03-16: status=completed
-- 2026-02-27 03:15:46 - Processing Miami-Dade (FL) 2026-03-17..2026-03-17
-- 2026-02-27 03:15:58 - Finished Miami-Dade (FL) 2026-03-17..2026-03-17: status=completed
-- 2026-02-27 03:15:58 - Processing Miami-Dade (FL) 2026-03-18..2026-03-18
-- 2026-02-27 03:16:11 - Finished Miami-Dade (FL) 2026-03-18..2026-03-18: status=completed
-- 2026-02-27 03:16:11 - Processing Miami-Dade (FL) 2026-03-19..2026-03-19
-- 2026-02-27 03:16:36 - Finished Miami-Dade (FL) 2026-03-19..2026-03-19: status=completed
-- 2026-02-27 03:16:36 - Processing Miami-Dade (FL) 2026-03-20..2026-03-20
-- 2026-02-27 03:16:57 - Finished Miami-Dade (FL) 2026-03-20..2026-03-20: status=completed
-- 2026-02-27 03:16:57 - Processing Miami-Dade (FL) 2026-03-21..2026-03-21
-- 2026-02-27 03:17:18 - Finished Miami-Dade (FL) 2026-03-21..2026-03-21: status=completed
-- 2026-02-27 03:17:18 - Processing Miami-Dade (FL) 2026-03-22..2026-03-22
-- 2026-02-27 03:17:40 - Finished Miami-Dade (FL) 2026-03-22..2026-03-22: status=completed
-- 2026-02-27 03:17:40 - Processing Miami-Dade (FL) 2026-03-23..2026-03-23
-- 2026-02-27 03:17:53 - Finished Miami-Dade (FL) 2026-03-23..2026-03-23: status=completed
-- 2026-02-27 03:17:53 - Processing Miami-Dade (FL) 2026-03-24..2026-03-24
-- 2026-02-27 03:18:06 - Finished Miami-Dade (FL) 2026-03-24..2026-03-24: status=completed
-- 2026-02-27 03:18:06 - Processing Miami-Dade (FL) 2026-03-25..2026-03-25
-- 2026-02-27 03:18:19 - Finished Miami-Dade (FL) 2026-03-25..2026-03-25: status=completed
-- 2026-02-27 03:18:19 - Processing Miami-Dade (FL) 2026-03-26..2026-03-26
-- 2026-02-27 03:18:40 - Finished Miami-Dade (FL) 2026-03-26..2026-03-26: status=completed
-- 2026-02-27 03:18:40 - Processing Miami-Dade (FL) 2026-03-27..2026-03-27
-- 2026-02-27 03:19:01 - Finished Miami-Dade (FL) 2026-03-27..2026-03-27: status=completed
-- 2026-02-27 03:19:01 - Processing Miami-Dade (FL) 2026-03-28..2026-03-28
-- 2026-02-27 03:19:22 - Finished Miami-Dade (FL) 2026-03-28..2026-03-28: status=completed
-- 2026-02-27 03:19:22 - Processing Miami-Dade (FL) 2026-03-29..2026-03-29
-- 2026-02-27 03:19:42 - Finished Miami-Dade (FL) 2026-03-29..2026-03-29: status=completed
-- 2026-02-27 03:19:42 - Processing Miami-Dade (FL) 2026-03-30..2026-03-30
-- 2026-02-27 03:19:55 - Finished Miami-Dade (FL) 2026-03-30..2026-03-30: status=completed
-- 2026-02-27 03:19:55 - Processing Miami-Dade (FL) 2026-03-31..2026-03-31
-- 2026-02-27 03:20:07 - Finished Miami-Dade (FL) 2026-03-31..2026-03-31: status=completed
-- 2026-02-27 03:20:07 - Processing Miami-Dade (FL) 2026-04-01..2026-04-01
-- 2026-02-27 03:20:20 - Finished Miami-Dade (FL) 2026-04-01..2026-04-01: status=completed
-- 2026-02-27 03:20:20 - Processing Miami-Dade (FL) 2026-04-02..2026-04-02
-- 2026-02-27 03:20:39 - Finished Miami-Dade (FL) 2026-04-02..2026-04-02: status=completed
-- 2026-02-27 03:20:39 - Processing Miami-Dade (FL) 2026-04-03..2026-04-03
-- 2026-02-27 03:21:00 - Finished Miami-Dade (FL) 2026-04-03..2026-04-03: status=completed
-- 2026-02-27 03:21:00 - Processing Miami-Dade (FL) 2026-04-04..2026-04-04
-- 2026-02-27 03:21:21 - Finished Miami-Dade (FL) 2026-04-04..2026-04-04: status=completed
-- 2026-02-27 03:21:21 - Processing Miami-Dade (FL) 2026-04-05..2026-04-05
-- 2026-02-27 03:21:43 - Finished Miami-Dade (FL) 2026-04-05..2026-04-05: status=completed
-- 2026-02-27 03:21:43 - Processing Miami-Dade (FL) 2026-04-06..2026-04-06
-- 2026-02-27 03:21:56 - Finished Miami-Dade (FL) 2026-04-06..2026-04-06: status=completed
-- 2026-02-27 03:21:56 - Processing Miami-Dade (FL) 2026-04-07..2026-04-07
-- 2026-02-27 03:22:09 - Finished Miami-Dade (FL) 2026-04-07..2026-04-07: status=completed
-- 2026-02-27 03:22:09 - Processing Miami-Dade (FL) 2026-04-08..2026-04-08
-- 2026-02-27 03:22:22 - Finished Miami-Dade (FL) 2026-04-08..2026-04-08: status=completed
-- 2026-02-27 03:22:22 - Processing Miami-Dade (FL) 2026-04-09..2026-04-09
-- 2026-02-27 03:22:43 - Finished Miami-Dade (FL) 2026-04-09..2026-04-09: status=completed
-- 2026-02-27 03:22:43 - Processing Miami-Dade (FL) 2026-04-10..2026-04-10
-- 2026-02-27 03:23:04 - Finished Miami-Dade (FL) 2026-04-10..2026-04-10: status=completed
-- 2026-02-27 03:23:04 - Processing Miami-Dade (FL) 2026-04-11..2026-04-11
-- 2026-02-27 03:23:27 - Finished Miami-Dade (FL) 2026-04-11..2026-04-11: status=completed
-- 2026-02-27 03:23:27 - Processing Miami-Dade (FL) 2026-04-12..2026-04-12
-- 2026-02-27 03:24:11 - Finished Miami-Dade (FL) 2026-04-12..2026-04-12: status=completed
-- 2026-02-27 03:24:11 - Processing Miami-Dade (FL) 2026-04-13..2026-04-13
-- 2026-02-27 03:24:59 - Finished Miami-Dade (FL) 2026-04-13..2026-04-13: status=completed
-- 2026-02-27 03:24:59 - Processing Miami-Dade (FL) 2026-04-14..2026-04-14
-- 2026-02-27 03:25:31 - Finished Miami-Dade (FL) 2026-04-14..2026-04-14: status=completed
-- 2026-02-27 03:25:31 - Processing Miami-Dade (FL) 2026-04-15..2026-04-15
-- 2026-02-27 03:25:43 - Finished Miami-Dade (FL) 2026-04-15..2026-04-15: status=completed
-- 2026-02-27 03:25:43 - Processing Miami-Dade (FL) 2026-04-16..2026-04-16
-- 2026-02-27 03:25:56 - Finished Miami-Dade (FL) 2026-04-16..2026-04-16: status=completed
-- 2026-02-27 03:25:56 - Processing Miami-Dade (FL) 2026-04-17..2026-04-17
-- 2026-02-27 03:26:23 - Finished Miami-Dade (FL) 2026-04-17..2026-04-17: status=completed
-- 2026-02-27 03:26:23 - Processing Miami-Dade (FL) 2026-04-18..2026-04-18
-- 2026-02-27 03:27:06 - Finished Miami-Dade (FL) 2026-04-18..2026-04-18: status=completed
-- 2026-02-27 03:27:06 - Processing Miami-Dade (FL) 2026-04-19..2026-04-19
-- 2026-02-27 03:27:52 - Finished Miami-Dade (FL) 2026-04-19..2026-04-19: status=completed
-- 2026-02-27 03:27:52 - Processing Miami-Dade (FL) 2026-04-20..2026-04-20
-- 2026-02-27 03:28:32 - Finished Miami-Dade (FL) 2026-04-20..2026-04-20: status=completed
-- 2026-02-27 03:28:32 - Processing Miami-Dade (FL) 2026-04-21..2026-04-21
-- 2026-02-27 03:29:16 - Finished Miami-Dade (FL) 2026-04-21..2026-04-21: status=completed
-- 2026-02-27 03:29:16 - Processing Miami-Dade (FL) 2026-04-22..2026-04-22
-- 2026-02-27 03:29:50 - Finished Miami-Dade (FL) 2026-04-22..2026-04-22: status=completed
-- 2026-02-27 03:29:50 - Processing Miami-Dade (FL) 2026-04-23..2026-04-23
-- 2026-02-27 03:30:29 - Finished Miami-Dade (FL) 2026-04-23..2026-04-23: status=completed
-- 2026-02-27 03:30:29 - Processing Miami-Dade (FL) 2026-04-24..2026-04-24
-- 2026-02-27 03:31:10 - Finished Miami-Dade (FL) 2026-04-24..2026-04-24: status=completed
-- 2026-02-27 03:31:11 - Processing Miami-Dade (FL) 2026-04-25..2026-04-25
-- 2026-02-27 03:32:02 - Finished Miami-Dade (FL) 2026-04-25..2026-04-25: status=completed
-- 2026-02-27 03:32:02 - Processing Miami-Dade (FL) 2026-04-26..2026-04-26
-- 2026-02-27 03:32:52 - Finished Miami-Dade (FL) 2026-04-26..2026-04-26: status=completed
-- 2026-02-27 03:32:52 - Processing Miami-Dade (FL) 2026-04-27..2026-04-27
-- 2026-02-27 03:33:17 - Finished Miami-Dade (FL) 2026-04-27..2026-04-27: status=completed
-- 2026-02-27 03:33:17 - Processing Miami-Dade (FL) 2026-04-28..2026-04-28
-- 2026-02-27 03:33:29 - Finished Miami-Dade (FL) 2026-04-28..2026-04-28: status=completed
-- 2026-02-27 03:33:29 - Processing Miami-Dade (FL) 2026-04-29..2026-04-29
-- 2026-02-27 03:33:40 - Finished Miami-Dade (FL) 2026-04-29..2026-04-29: status=completed
-- 2026-02-27 03:33:40 - Processing Miami-Dade (FL) 2026-04-30..2026-04-30
+- 2026-02-27 03:37:39 - Finished Miami-Dade (FL) 2026-05-12..2026-05-12: status=completed
+- 2026-02-27 03:37:39 - Processing Miami-Dade (FL) 2026-05-13..2026-05-13
+- 2026-02-27 03:38:01 - Finished Miami-Dade (FL) 2026-05-13..2026-05-13: status=completed
+- 2026-02-27 03:38:01 - Processing Miami-Dade (FL) 2026-05-14..2026-05-14
+- 2026-02-27 03:38:22 - Finished Miami-Dade (FL) 2026-05-14..2026-05-14: status=completed
+- 2026-02-27 03:38:22 - Processing Miami-Dade (FL) 2026-05-15..2026-05-15
+- 2026-02-27 03:38:43 - Finished Miami-Dade (FL) 2026-05-15..2026-05-15: status=completed
+- 2026-02-27 03:38:43 - Processing Miami-Dade (FL) 2026-05-16..2026-05-16
+- 2026-02-27 03:39:05 - Finished Miami-Dade (FL) 2026-05-16..2026-05-16: status=completed
+- 2026-02-27 03:39:05 - Processing Miami-Dade (FL) 2026-05-17..2026-05-17
+- 2026-02-27 03:39:27 - Finished Miami-Dade (FL) 2026-05-17..2026-05-17: status=completed
+- 2026-02-27 03:39:27 - Processing Miami-Dade (FL) 2026-05-18..2026-05-18
+- 2026-02-27 03:39:39 - Finished Miami-Dade (FL) 2026-05-18..2026-05-18: status=completed
+- 2026-02-27 03:39:39 - Processing Miami-Dade (FL) 2026-05-19..2026-05-19
+- 2026-02-27 03:39:51 - Finished Miami-Dade (FL) 2026-05-19..2026-05-19: status=completed
+- 2026-02-27 03:39:51 - Processing Miami-Dade (FL) 2026-05-20..2026-05-20
+- 2026-02-27 03:40:03 - Finished Miami-Dade (FL) 2026-05-20..2026-05-20: status=completed
+- 2026-02-27 03:40:03 - Processing Miami-Dade (FL) 2026-05-21..2026-05-21
+- 2026-02-27 03:40:24 - Finished Miami-Dade (FL) 2026-05-21..2026-05-21: status=completed
+- 2026-02-27 03:40:24 - Processing Miami-Dade (FL) 2026-05-22..2026-05-22
+- 2026-02-27 03:40:46 - Finished Miami-Dade (FL) 2026-05-22..2026-05-22: status=completed
+- 2026-02-27 03:40:46 - Processing Miami-Dade (FL) 2026-05-23..2026-05-23
+- 2026-02-27 03:41:06 - Finished Miami-Dade (FL) 2026-05-23..2026-05-23: status=completed
+- 2026-02-27 03:41:06 - Processing Miami-Dade (FL) 2026-05-24..2026-05-24
+- 2026-02-27 03:41:29 - Finished Miami-Dade (FL) 2026-05-24..2026-05-24: status=completed
+- 2026-02-27 03:41:29 - Processing Miami-Dade (FL) 2026-05-25..2026-05-25
+- 2026-02-27 03:41:50 - Finished Miami-Dade (FL) 2026-05-25..2026-05-25: status=completed
+- 2026-02-27 03:41:50 - Processing Miami-Dade (FL) 2026-05-26..2026-05-26
+- 2026-02-27 03:42:01 - Finished Miami-Dade (FL) 2026-05-26..2026-05-26: status=completed
+- 2026-02-27 03:42:01 - Processing Miami-Dade (FL) 2026-05-27..2026-05-27
+- 2026-02-27 03:42:13 - Finished Miami-Dade (FL) 2026-05-27..2026-05-27: status=completed
+- 2026-02-27 03:42:13 - Processing Miami-Dade (FL) 2026-05-28..2026-05-28
+- 2026-02-27 03:42:34 - Finished Miami-Dade (FL) 2026-05-28..2026-05-28: status=completed
+- 2026-02-27 03:42:34 - Processing Miami-Dade (FL) 2026-05-29..2026-05-29
+- 2026-02-27 03:42:55 - Finished Miami-Dade (FL) 2026-05-29..2026-05-29: status=completed
+- 2026-02-27 03:42:55 - Processing Miami-Dade (FL) 2026-05-30..2026-05-30
+- 2026-02-27 03:43:16 - Finished Miami-Dade (FL) 2026-05-30..2026-05-30: status=completed
+- 2026-02-27 03:43:16 - Processing Miami-Dade (FL) 2026-05-31..2026-05-31
+- 2026-02-27 03:43:37 - Finished Miami-Dade (FL) 2026-05-31..2026-05-31: status=completed
+- 2026-02-27 03:43:37 - Processing Miami-Dade (FL) 2026-06-01..2026-06-01
+- 2026-02-27 03:43:49 - Finished Miami-Dade (FL) 2026-06-01..2026-06-01: status=completed
+- 2026-02-27 03:43:49 - Processing Miami-Dade (FL) 2026-06-02..2026-06-02
+- 2026-02-27 03:44:00 - Finished Miami-Dade (FL) 2026-06-02..2026-06-02: status=completed
+- 2026-02-27 03:44:00 - Processing Miami-Dade (FL) 2026-06-03..2026-06-03
+- 2026-02-27 03:44:11 - Finished Miami-Dade (FL) 2026-06-03..2026-06-03: status=completed
+- 2026-02-27 03:44:12 - Processing Miami-Dade (FL) 2026-06-04..2026-06-04
+- 2026-02-27 03:44:33 - Finished Miami-Dade (FL) 2026-06-04..2026-06-04: status=completed
+- 2026-02-27 03:44:33 - Processing Miami-Dade (FL) 2026-06-05..2026-06-05
+- 2026-02-27 03:44:54 - Finished Miami-Dade (FL) 2026-06-05..2026-06-05: status=completed
+- 2026-02-27 03:44:54 - Processing Miami-Dade (FL) 2026-06-06..2026-06-06
+- 2026-02-27 03:45:14 - Finished Miami-Dade (FL) 2026-06-06..2026-06-06: status=completed
+- 2026-02-27 03:45:14 - Processing Miami-Dade (FL) 2026-06-07..2026-06-07
+- 2026-02-27 03:45:36 - Finished Miami-Dade (FL) 2026-06-07..2026-06-07: status=completed
+- 2026-02-27 03:45:36 - Processing Miami-Dade (FL) 2026-06-08..2026-06-08
+- 2026-02-27 03:45:47 - Finished Miami-Dade (FL) 2026-06-08..2026-06-08: status=completed
+- 2026-02-27 03:45:47 - Processing Miami-Dade (FL) 2026-06-09..2026-06-09
+- 2026-02-27 03:46:08 - Finished Miami-Dade (FL) 2026-06-09..2026-06-09: status=completed
+- 2026-02-27 03:46:08 - Processing Miami-Dade (FL) 2026-06-10..2026-06-10
+- 2026-02-27 03:46:20 - Finished Miami-Dade (FL) 2026-06-10..2026-06-10: status=completed
+- 2026-02-27 03:46:20 - Processing Miami-Dade (FL) 2026-06-11..2026-06-11
+- 2026-02-27 03:46:40 - Finished Miami-Dade (FL) 2026-06-11..2026-06-11: status=completed
+- 2026-02-27 03:46:40 - Processing Miami-Dade (FL) 2026-06-12..2026-06-12
+- 2026-02-27 03:47:02 - Finished Miami-Dade (FL) 2026-06-12..2026-06-12: status=completed
+- 2026-02-27 03:47:02 - Processing Miami-Dade (FL) 2026-06-13..2026-06-13
+- 2026-02-27 03:47:23 - Finished Miami-Dade (FL) 2026-06-13..2026-06-13: status=completed
+- 2026-02-27 03:47:23 - Processing Miami-Dade (FL) 2026-06-14..2026-06-14
+- 2026-02-27 03:47:45 - Finished Miami-Dade (FL) 2026-06-14..2026-06-14: status=completed
+- 2026-02-27 03:47:45 - Processing Miami-Dade (FL) 2026-06-15..2026-06-15
+- 2026-02-27 03:47:57 - Finished Miami-Dade (FL) 2026-06-15..2026-06-15: status=completed
+- 2026-02-27 03:47:57 - Processing Miami-Dade (FL) 2026-06-16..2026-06-16
+- 2026-02-27 03:48:17 - Finished Miami-Dade (FL) 2026-06-16..2026-06-16: status=completed
+- 2026-02-27 03:48:17 - Processing Miami-Dade (FL) 2026-06-17..2026-06-17
+- 2026-02-27 03:48:38 - Finished Miami-Dade (FL) 2026-06-17..2026-06-17: status=completed
+- 2026-02-27 03:48:38 - Processing Miami-Dade (FL) 2026-06-18..2026-06-18
+- 2026-02-27 03:48:59 - Finished Miami-Dade (FL) 2026-06-18..2026-06-18: status=completed
+- 2026-02-27 03:48:59 - Processing Miami-Dade (FL) 2026-06-19..2026-06-19
+- 2026-02-27 03:49:21 - Finished Miami-Dade (FL) 2026-06-19..2026-06-19: status=completed
+- 2026-02-27 03:49:21 - Processing Miami-Dade (FL) 2026-06-20..2026-06-20
+- 2026-02-27 03:49:42 - Finished Miami-Dade (FL) 2026-06-20..2026-06-20: status=completed
+- 2026-02-27 03:49:42 - Processing Miami-Dade (FL) 2026-06-21..2026-06-21
+- 2026-02-27 03:50:03 - Finished Miami-Dade (FL) 2026-06-21..2026-06-21: status=completed
+- 2026-02-27 03:50:03 - Processing Miami-Dade (FL) 2026-06-22..2026-06-22
+- 2026-02-27 03:50:15 - Finished Miami-Dade (FL) 2026-06-22..2026-06-22: status=completed
+- 2026-02-27 03:50:15 - Processing Miami-Dade (FL) 2026-06-23..2026-06-23
+- 2026-02-27 03:50:36 - Finished Miami-Dade (FL) 2026-06-23..2026-06-23: status=completed
+- 2026-02-27 03:50:36 - Processing Miami-Dade (FL) 2026-06-24..2026-06-24
+- 2026-02-27 03:50:47 - Finished Miami-Dade (FL) 2026-06-24..2026-06-24: status=completed
+- 2026-02-27 03:50:47 - Processing Miami-Dade (FL) 2026-06-25..2026-06-25
+- 2026-02-27 03:51:08 - Finished Miami-Dade (FL) 2026-06-25..2026-06-25: status=completed
+- 2026-02-27 03:51:08 - Processing Miami-Dade (FL) 2026-06-26..2026-06-26
+- 2026-02-27 03:51:29 - Finished Miami-Dade (FL) 2026-06-26..2026-06-26: status=completed
+- 2026-02-27 03:51:29 - Processing Miami-Dade (FL) 2026-06-27..2026-06-27
+- 2026-02-27 03:51:49 - Finished Miami-Dade (FL) 2026-06-27..2026-06-27: status=completed
+- 2026-02-27 03:51:49 - Processing Miami-Dade (FL) 2026-06-28..2026-06-28
+- 2026-02-27 03:52:11 - Finished Miami-Dade (FL) 2026-06-28..2026-06-28: status=completed
+- 2026-02-27 03:52:11 - Processing Miami-Dade (FL) 2026-06-29..2026-06-29
+- 2026-02-27 03:52:23 - Finished Miami-Dade (FL) 2026-06-29..2026-06-29: status=completed
+- 2026-02-27 03:52:23 - Processing Miami-Dade (FL) 2026-06-30..2026-06-30
+- 2026-02-27 03:52:43 - Finished Miami-Dade (FL) 2026-06-30..2026-06-30: status=completed
+- 2026-02-27 03:52:43 - Backfill run completed.

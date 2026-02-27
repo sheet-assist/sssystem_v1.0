@@ -22,18 +22,11 @@ class Command(BaseCommand):
         created = 0
         for name in FL_COUNTIES:
             slug = slugify(name)
-            foreclosure_url = f'https://{slug}.realforeclose.com/'
-            taxdeed_url = f'https://{slug}.realtaxdeed.com/'
             defaults = {
                 'fips_code': '',
                 'is_active': True,
-                'available_prospect_types': ['TD'],
-                'uses_realtdm': False,
-                'uses_auction_calendar': False,
                 'auction_calendar_url': '',
                 'realtdm_url': '',
-                'foreclosure_url': foreclosure_url,
-                'taxdeed_url': taxdeed_url,
                 'platform': 'realforeclose',
             }
             obj, was_created = County.objects.get_or_create(state=state, slug=slug, defaults={**defaults, 'name': name})

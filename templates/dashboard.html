@@ -3,7 +3,14 @@
 {% block title %}Dashboard - SSSys{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Dashboard</h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0">Dashboard</h2>
+  {% if is_admin %}
+  <button type="button" id="toggleProspectRevenue" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-eye"></i> Show Prospect Revenue
+  </button>
+  {% endif %}
+</div>
 
 <div class="card mb-3">
   <div class="card-body py-2 d-flex justify-content-end">
@@ -44,32 +51,34 @@
           <small>Qualified Surplus Amount: <span class="text-success">$<span id="cardQualifiedSurplus">{{ qualified_surplus_amount|floatformat:0 }}</span></span></small>
         </div>
         {% if is_admin %}
-        <div>
-          <small>Qualified Revenue (<span id="cardTierPct">{{ ss_revenue_tier }}</span>%): <span class="text-primary">$<span id="cardTotalRevenue">{{ total_revenue|floatformat:0 }}</span></span></small>
-        </div>
-        <div class="table-responsive mt-2">
-          <table class="table table-sm table-borderless mb-0 align-middle" style="font-size: 0.72rem;">
-            <thead>
-              <tr class="text-muted">
-                <th class="ps-0" title="Type: Prospect type code (TD, TL, SS, MF).">Type</th>
-                <th class="text-end" title="Prospect Count: Total number of prospects for this type.">P</th>
-                <th class="text-end" title="Qualified Count: Number of qualified prospects for this type.">Q</th>
-                <th class="text-end" title="Total Surplus: Sum of qualified surplus amounts for this type.">Surplus</th>
-                <th class="text-end pe-0" title="Prospect Revenue: Revenue calculated from qualified surplus using the configured tier.">Rev</th>
-              </tr>
-            </thead>
-            <tbody id="cardProspectRevTypeBody">
-              {% for item in revenue_distribution_prospects_by_type %}
-              <tr>
-                <td class="ps-0"><span class="badge bg-secondary">{{ item.code }}</span></td>
-                <td class="text-end">{{ item.prospect_count }}</td>
-                <td class="text-end">{{ item.qualified_count }}</td>
-                <td class="text-end">${{ item.total_surplus|floatformat:0 }}</td>
-                <td class="text-end pe-0">${{ item.prospect_revenue|floatformat:0 }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div id="prospectRevenueSection" style="display:none;">
+          <div>
+            <small>Qualified Revenue (<span id="cardTierPct">{{ ss_revenue_tier }}</span>%): <span class="text-primary">$<span id="cardTotalRevenue">{{ total_revenue|floatformat:0 }}</span></span></small>
+          </div>
+          <div class="table-responsive mt-2">
+            <table class="table table-sm table-borderless mb-0 align-middle" style="font-size: 0.72rem;">
+              <thead>
+                <tr class="text-muted">
+                  <th class="ps-0" title="Type: Prospect type code (TD, TL, SS, MF).">Type</th>
+                  <th class="text-end" title="Prospect Count: Total number of prospects for this type.">P</th>
+                  <th class="text-end" title="Qualified Count: Number of qualified prospects for this type.">Q</th>
+                  <th class="text-end" title="Total Surplus: Sum of qualified surplus amounts for this type.">Surplus</th>
+                  <th class="text-end pe-0" title="Prospect Revenue: Revenue calculated from qualified surplus using the configured tier.">Rev</th>
+                </tr>
+              </thead>
+              <tbody id="cardProspectRevTypeBody">
+                {% for item in revenue_distribution_prospects_by_type %}
+                <tr>
+                  <td class="ps-0"><span class="badge bg-secondary">{{ item.code }}</span></td>
+                  <td class="text-end">{{ item.prospect_count }}</td>
+                  <td class="text-end">{{ item.qualified_count }}</td>
+                  <td class="text-end">${{ item.total_surplus|floatformat:0 }}</td>
+                  <td class="text-end pe-0">${{ item.prospect_revenue|floatformat:0 }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
         {% endif %}
       </div>
@@ -920,6 +929,33 @@
         const newEnd = cardsAddDays(newStart, 29);
         fetchCards({ cards_mode: "30days", cards_start: newStart, cards_end: newEnd });
       }
+    });
+  })();
+</script>
+
+<script>
+  // Prospect Revenue Toggle
+  (function () {
+    const btn = document.getElementById('toggleProspectRevenue');
+    const section = document.getElementById('prospectRevenueSection');
+    if (!btn || !section) return;
+
+    const KEY = 'dashboard_show_prospect_revenue';
+
+    function applyState(show) {
+      section.style.display = show ? '' : 'none';
+      btn.innerHTML = show
+        ? '<i class="bi bi-eye-slash"></i> Hide Prospect Revenue'
+        : '<i class="bi bi-eye"></i> Show Prospect Revenue';
+    }
+
+    // Restore saved state (default: hidden)
+    applyState(localStorage.getItem(KEY) === 'true');
+
+    btn.addEventListener('click', function () {
+      const nowVisible = section.style.display !== 'none';
+      localStorage.setItem(KEY, String(!nowVisible));
+      applyState(!nowVisible);
     });
   })();
 </script>

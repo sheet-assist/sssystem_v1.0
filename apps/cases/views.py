@@ -59,6 +59,23 @@ class CaseListView(CasesAccessMixin, ListView):
         ctx["county_search"] = self.request.GET.get("county", "")
         ctx["state_search"] = self.request.GET.get("state", "")
         ctx["states"] = State.objects.filter(is_active=True).order_by("name")
+
+        qs = self.object_list
+        ctx["stats_total"] = qs.count()
+        ctx["stats_active"] = qs.filter(status="active").count()
+        ctx["stats_closed_won"] = qs.filter(status="closed_won").count()
+        ctx["stats_first_contract"] = (
+            qs.filter(contract_date__isnull=False)
+            .order_by("contract_date")
+            .values_list("contract_date", flat=True)
+            .first()
+        )
+        ctx["stats_last_contract"] = (
+            qs.filter(contract_date__isnull=False)
+            .order_by("-contract_date")
+            .values_list("contract_date", flat=True)
+            .first()
+        )
         return ctx
 
 

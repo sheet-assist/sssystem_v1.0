@@ -15,8 +15,15 @@
 </nav>
 {% endif %}
 
+<style>.prospect-revenue-hidden { display: none !important; }</style>
+
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="mb-0">{{ page_title|default:"Prospects" }}{% if county_obj %} &mdash; {{ county_obj.name }}, {{ state_abbr }}{% endif %}</h2>
+  {% if can_view_revenue %}
+  <button type="button" id="toggleProspectListRevenue" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-eye"></i> Show Prospect Revenue
+  </button>
+  {% endif %}
 </div>
 
 {# Stats + Auction date range cards (all in one responsive row) #}
@@ -53,7 +60,7 @@
     </div>
   </div>
 
-  <div class="col-6 col-md-3 mb-2">
+  <div class="col-6 col-md-3 mb-2 prospect-revenue-col prospect-revenue-hidden">
     <div class="card h-100">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center">
@@ -131,7 +138,7 @@
         <th>Auction Date</th>
         <th class="text-end d-none d-lg-table-cell">Surplus</th>
         {% if can_view_revenue %}
-        <th class="text-end d-none d-lg-table-cell">Revenue ({{ ss_revenue_tier }}%)</th>
+        <th class="text-end d-none d-lg-table-cell prospect-revenue-col prospect-revenue-hidden">Revenue ({{ ss_revenue_tier }}%)</th>
         {% endif %}
         <th>Qualification</th>
         <th class="text-center d-none d-lg-table-cell">AC</th>
@@ -179,7 +186,7 @@
         <td>{{ prospect.auction_date|date:"m/d/Y"|default:"-" }}</td>
         <td class="text-end d-none d-lg-table-cell">{% if prospect.surplus_amount %}${{ prospect.surplus_amount|floatformat:2 }}{% else %}-{% endif %}</td>
         {% if can_view_revenue %}
-        <td class="text-end d-none d-lg-table-cell">{% if prospect.ss_revenue_amount %}${{ prospect.ss_revenue_amount|floatformat:2 }}{% else %}-{% endif %}</td>
+        <td class="text-end d-none d-lg-table-cell prospect-revenue-col prospect-revenue-hidden">{% if prospect.ss_revenue_amount %}${{ prospect.ss_revenue_amount|floatformat:2 }}{% else %}-{% endif %}</td>
         {% endif %}
         <td>
           {% if prospect.qualification_status == 'qualified' %}
@@ -273,6 +280,34 @@
 </div>
 
 {% include "includes/pagination.html" %}
+
+<script>
+  // Prospect Revenue Toggle
+  (function () {
+    const btn = document.getElementById('toggleProspectListRevenue');
+    if (!btn) return;
+
+    const KEY = 'prospects_list_show_revenue';
+
+    function applyState(show) {
+      document.querySelectorAll('.prospect-revenue-col').forEach(function (el) {
+        el.classList.toggle('prospect-revenue-hidden', !show);
+      });
+      btn.innerHTML = show
+        ? '<i class="bi bi-eye-slash"></i> Hide Prospect Revenue'
+        : '<i class="bi bi-eye"></i> Show Prospect Revenue';
+    }
+
+    // Restore saved state (default: hidden)
+    applyState(localStorage.getItem(KEY) === 'true');
+
+    btn.addEventListener('click', function () {
+      const nowVisible = !document.querySelector('.prospect-revenue-col')?.classList.contains('prospect-revenue-hidden');
+      localStorage.setItem(KEY, String(!nowVisible));
+      applyState(!nowVisible);
+    });
+  })();
+</script>
 
 {% if user.profile.is_admin %}
 <div class="modal fade" id="confirmDeleteProspectModal" tabindex="-1" aria-labelledby="confirmDeleteProspectModalLabel" aria-hidden="true">
