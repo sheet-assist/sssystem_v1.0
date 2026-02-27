@@ -95,3 +95,42 @@ def log_case_action(case, user, action_type, description="", metadata=None):
         case=case, user=user, action_type=action_type,
         description=description, metadata=metadata or {},
     )
+
+
+def case_document_upload_to(instance, filename):
+    return f"cases/{instance.case.pk}/{filename}"
+
+
+class CaseDocument(models.Model):
+    """Files attached to a Case (Digital Folder)."""
+    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name="documents")
+    file = models.FileField(upload_to=case_document_upload_to)
+    name = models.CharField(max_length=255, blank=True)
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    size = models.PositiveIntegerField(null=True, blank=True)
+    content_type = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        ordering = ["-uploaded_at"]
+
+    def __str__(self):
+        return f"{self.name or self.file.name} (Case {self.case.case_number or self.case.pk})"
+
+    def filename(self):
+        return self.file.name.split("/")[-1]
+
+
+class CaseDocumentNote(models.Model):
+    """Notes attached to a CaseDocument."""
+    document = models.ForeignKey(CaseDocument, on_delete=models.CASCADE, related_name="notes")
+    content = models.TextField()
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        who = self.created_by.get_full_name() if self.created_by else "System"
+        return f"Document note by {who} on {self.created_at:%Y-%m-%d %H:%M}"

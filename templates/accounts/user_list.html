@@ -6,6 +6,9 @@
 <div class="container-fluid mt-4">
   <div class="d-flex justify-content-between align-items-center mb-2">
     <h3>Users</h3>
+    <a href="{% url 'accounts:user_add' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-person-plus"></i> Add User
+    </a>
   </div>
 
   {% if profiles_by_role %}

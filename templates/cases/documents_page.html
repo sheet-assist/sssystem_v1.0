@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Digital Folder — Case {{ object.case_number|default:object.pk }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'cases:list' %}">Cases</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'cases:detail' object.pk %}">{{ object.case_number|default:object.pk }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Digital Folder</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h3 class="mb-0"><i class="bi bi-folder2-open me-2"></i>Digital Folder</h3>
+    <div class="small text-muted">
+      Case {{ object.case_number|default:object.pk }}
+      &middot; {{ object.get_case_type_display }}
+      &middot; {{ object.county.name }}, {{ object.county.state.abbreviation }}
+    </div>
+  </div>
+  <a href="{% url 'cases:detail' object.pk %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Back to Case
+  </a>
+</div>
+
+
+{# ── Section 1: Case Documents ──────────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header fw-semibold py-2 d-flex justify-content-between align-items-center">
+    <span>
+      <i class="bi bi-folder2 me-1"></i> Case Documents
+      <span class="badge bg-secondary ms-1">{{ object.documents.count }}</span>
+    </span>
+    <small class="text-muted fw-normal" style="font-size:.75rem;">Files specific to this case</small>
+  </div>
+  <div class="card-body">
+    <div id="caseDocumentsRootV2" data-case-pk="{{ object.pk }}">
+      {% include "cases/_documents_content_v2.html" with docs=object.documents.all object=object %}
+    </div>
+  </div>
+</div>
+
+
+{# ── Section 2: Prospect Documents ──────────────────────────────────────────── #}
+{% if object.prospect %}
+<div class="card mb-4">
+  <div class="card-header fw-semibold py-2 d-flex justify-content-between align-items-center">
+    <span>
+      <i class="bi bi-folder me-1"></i> Prospect Documents
+      <span class="badge bg-secondary ms-1">{{ prospect_docs|length }}</span>
+    </span>
+    <div class="d-flex align-items-center gap-2">
+      <small class="text-muted fw-normal" style="font-size:.75rem;">From prospect {{ object.prospect.case_number }}</small>
+      <a href="{% url 'prospects:documents_page_v2' object.prospect.pk %}" target="_blank" rel="noopener"
+         class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-box-arrow-up-right"></i> Open in Prospect
+      </a>
+    </div>
+  </div>
+  <div class="card-body">
+    <div id="prospectDocumentsRootV2" data-prospect-pk="{{ object.prospect.pk }}">
+      {% include "prospects/_documents_content_v2.html" with docs=prospect_docs object=object.prospect %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+
+{# ── Section 3: TDM Scraped Documents ───────────────────────────────────────── #}
+{% if object.prospect %}
+{% with all_tdm=all_tdm %}
+<div class="card mb-4">
+  <div class="card-header fw-semibold py-2 d-flex justify-content-between align-items-center">
+    <span>
+      <i class="bi bi-cloud-download me-1"></i> TDM Scraped Documents
+      <span class="badge bg-secondary ms-1">{{ all_tdm|length }}</span>
+    </span>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span id="tdm-sync-status-df" class="small text-muted"></span>
+      {% if tdm_last_sync %}
+        <small class="text-muted fw-normal" style="font-size:.75rem;">Last synced {{ tdm_last_sync|date:"m/d/Y H:i" }}</small>
+      {% endif %}
+      <button id="sync-tdm-btn-df"
+              class="btn btn-outline-primary btn-sm"
+              data-sync-url="{% url 'prospects:tdm_sync' object.prospect.pk %}"
+              data-status-url="{% url 'prospects:tdm_sync_status' object.prospect.pk %}">
+        <i class="bi bi-arrow-repeat"></i> Sync TDM
+      </button>
+    </div>
+  </div>
+  <div class="card-body p-0">
+
+    {% if all_tdm %}
+    {# Downloaded documents — always visible #}
+    <ul class="list-group list-group-flush">
+      {% for doc in all_tdm %}
+      {% if doc.is_downloaded %}
+      <li class="list-group-item py-2 px-3">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <a href="{% url 'prospects:tdm_document_open' object.prospect.pk doc.pk %}" target="_blank" rel="noopener"
+               class="fw-medium small link-primary link-underline-opacity-0 link-underline-opacity-100-hover">
+              <i class="bi bi-file-earmark-pdf me-1 text-danger"></i>{{ doc.title }}
+            </a>
+            {% if doc.filename %}<div class="text-muted" style="font-size:.78rem;">{{ doc.filename }}</div>{% endif %}
+          </div>
+          <div class="text-end text-nowrap ms-3">
+            <span class="badge bg-success mb-1">Downloaded</span>
+            <div class="text-muted" style="font-size:.75rem;">{{ doc.downloaded_at|date:"m/d/Y H:i" }}</div>
+          </div>
+        </div>
+      </li>
+      {% endif %}
+      {% endfor %}
+    </ul>
+
+    {# Not-downloaded documents — collapsed #}
+    <div class="accordion accordion-flush" id="tdmPendingAccordion">
+      <div class="accordion-item border-0">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed py-2 px-3 small text-muted bg-light" type="button"
+                  data-bs-toggle="collapse" data-bs-target="#tdmPendingList" aria-expanded="false">
+            <i class="bi bi-hourglass-split me-2"></i> Not yet downloaded
+            <span class="badge bg-light text-secondary border ms-2">
+              {% with pending_count=all_tdm|length %}{{ pending_count }}{% endwith %}
+            </span>
+          </button>
+        </h2>
+        <div id="tdmPendingList" class="accordion-collapse collapse">
+          <ul class="list-group list-group-flush">
+            {% for doc in all_tdm %}
+            {% if not doc.is_downloaded %}
+            <li class="list-group-item py-2 px-3 small">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <div class="fw-medium">{{ doc.title }}</div>
+                  {% if doc.filename %}<div class="text-muted" style="font-size:.78rem;">{{ doc.filename }}</div>{% endif %}
+                  <div class="text-muted" style="font-size:.75rem;">TDM date: {{ doc.doc_date|default:"-" }}</div>
+                </div>
+                <div class="text-end ms-3">
+                  {% if doc.is_auto_download %}
+                  <span class="badge bg-warning text-dark">Queued</span>
+                  {% else %}
+                  <span class="badge bg-light text-secondary border">Not tracked</span>
+                  {% endif %}
+                  {% if doc.download_error %}
+                  <div class="text-danger" style="font-size:.72rem;" title="{{ doc.download_error }}">
+                    <i class="bi bi-exclamation-circle"></i> Error
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            </li>
+            {% endif %}
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    {% else %}
+    <div class="p-3 text-muted small">No TDM documents found. Click <strong>Sync TDM</strong> to scrape.</div>
+    {% endif %}
+
+  </div>
+</div>
+{% endwith %}
+{% endif %}
+
+
+<script src="{% static 'js/case_documents_v2.js' %}"></script>
+<script src="{% static 'js/prospect_documents_v2.js' %}"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ── TDM Sync button ─────────────────────────────────── */
+  var btn = document.getElementById('sync-tdm-btn-df');
+  if (!btn) return;
+
+  var statusEl = document.getElementById('tdm-sync-status-df');
+
+  function getCsrf() {
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  function setStatus(msg, cls) {
+    statusEl.className = 'small ' + (cls || 'text-muted');
+    statusEl.textContent = msg;
+  }
+
+  function resetBtn() {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Sync TDM';
+  }
+
+  function poll(statusUrl) {
+    fetch(statusUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.state === 'running') {
+          setStatus('Syncing\u2026', 'text-info');
+          setTimeout(function () { poll(statusUrl); }, 3000);
+        } else if (data.state === 'completed') {
+          var r = data.result || {};
+          var newDocs = r.new_docs || 0;
+          setStatus(
+            'Done \u2014 ' + newDocs + ' new, ' + (r.downloaded || 0) + ' downloaded',
+            newDocs > 0 ? 'text-success' : 'text-muted'
+          );
+          resetBtn();
+          if (newDocs > 0 || (r.downloaded || 0) > 0) {
+            setTimeout(function () { window.location.reload(); }, 1200);
+          }
+        } else if (data.state === 'failed') {
+          setStatus('Sync failed: ' + (data.error || 'unknown error'), 'text-danger');
+          resetBtn();
+        }
+      })
+      .catch(function () {
+        setStatus('Status check failed.', 'text-danger');
+        resetBtn();
+      });
+  }
+
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Syncing\u2026';
+    setStatus('Starting\u2026', 'text-info');
+
+    var syncUrl   = btn.dataset.syncUrl;
+    var statusUrl = btn.dataset.statusUrl;
+
+    fetch(syncUrl, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCsrf(),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.started) {
+          poll(statusUrl);
+        } else {
+          setStatus(data.error || 'Could not start sync.', 'text-warning');
+          resetBtn();
+        }
+      })
+      .catch(function () {
+        setStatus('Request failed.', 'text-danger');
+        resetBtn();
+      });
+  });
+})();
+</script>
+{% endblock %}

@@ -37,6 +37,11 @@ urlpatterns = [
     # Dedicated Digital Folder V2 page
     path("detail/<int:pk>/documents/v2/", views.ProspectDocumentsPageV2View.as_view(), name="documents_page_v2"),
 
+    # TDM on-demand sync
+    path("detail/<int:pk>/tdm-sync/", views.prospect_tdm_sync, name="tdm_sync"),
+    path("detail/<int:pk>/tdm-sync/status/", views.prospect_tdm_sync_status, name="tdm_sync_status"),
+    path("detail/<int:pk>/tdm-docs/fragment/", views.prospect_tdm_docs_fragment, name="tdm_docs_fragment"),
+
     # Navigation flow: type → state → county → list
     path("browse/<ptype:prospect_type>/", views.StateSelectView.as_view(), name="state_select"),
     path("browse/all/", views.ProspectListView.as_view(), name="list_all"),

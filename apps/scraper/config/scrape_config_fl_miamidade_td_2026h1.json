@@ -1,9 +1,9 @@
 {
   "state": "FL",
-  "doc_type": "TD",
+  "doc_type": "MF",
   "counties": ["Miami-Dade"],
-  "start_date": "2026-01-01",
-  "end_date": "2026-06-30",
+  "start_date": "2024-01-01",
+  "end_date": "2024-12-31",
   "chunk_days": 1,
   "group_name": "fl_miamidade_td_2026h1",
   "output_file": "output_fl_miamidade_td_2026h1.md",

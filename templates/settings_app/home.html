@@ -47,7 +47,10 @@
       <div class="card-body">
         <h5 class="card-title">Users</h5>
         <p class="text-muted">Manage user accounts and roles</p>
-        <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm">User List</a>
+        <div class="btn-group" role="group" aria-label="User actions">
+          <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm">User List</a>
+          <a href="{% url 'accounts:user_add' %}" class="btn btn-outline-primary btn-sm">Add User</a>
+        </div>
       </div>
     </div>
   </div>

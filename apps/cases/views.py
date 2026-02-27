@@ -1,17 +1,23 @@
+import json
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.shortcuts import get_object_or_404, redirect
+from django.http import FileResponse, HttpResponse, HttpResponseForbidden, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.views.generic import CreateView, DetailView, FormView, ListView
 from django.db.models import Q
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.accounts.mixins import CasesAccessMixin
 from apps.locations.models import State
 from apps.prospects.models import Prospect, log_prospect_action
 
 from .forms import CaseFollowUpForm, CaseNoteForm, CaseStatusForm, ConvertToCaseForm
-from .models import Case, CaseFollowUp, CaseNote, log_case_action
+from .models import Case, CaseDocument, CaseFollowUp, CaseNote, log_case_action
 
 User = get_user_model()
 
@@ -93,6 +99,8 @@ class CaseDetailView(CasesAccessMixin, DetailView):
             "action_logs__user",
             "prospect__action_logs__user",
             "prospect__tdm_documents",
+            "documents__uploaded_by",
+            "documents__notes__created_by",
         )
 
     def get_context_data(self, **kwargs):
@@ -262,3 +270,163 @@ class CaseEmailView(CasesAccessMixin, DetailView):
         ctx = super().get_context_data(**kwargs)
         ctx["email_addresses"] = []
         return ctx
+
+
+class CaseDocumentsPageView(CasesAccessMixin, DetailView):
+    """Dedicated Digital Folder page for a Case (opens in new tab).
+
+    Shows three sections:
+    - Case Documents   (CaseDocument — full upload/delete/notes)
+    - Prospect Documents (ProspectDocument — read-only list + upload via prospect endpoints)
+    - TDM Scraped Documents (ProspectTDMDocument — with on-demand Sync button)
+    """
+    model = Case
+    template_name = "cases/documents_page.html"
+
+    def get_queryset(self):
+        return Case.objects.select_related(
+            "prospect", "prospect__county", "prospect__county__state",
+        ).prefetch_related(
+            "documents__uploaded_by",
+            "documents__notes__created_by",
+            "prospect__documents__uploaded_by",
+            "prospect__documents__notes__created_by",
+            "prospect__tdm_documents",
+        )
+
+    def get_context_data(self, **kwargs):
+        from django.db.models import Max
+        ctx = super().get_context_data(**kwargs)
+        prospect = self.object.prospect
+        if prospect:
+            ctx["prospect_docs"] = prospect.documents.all().select_related(
+                "uploaded_by"
+            ).prefetch_related("notes__created_by")
+            ctx["all_tdm"] = prospect.tdm_documents.all()
+            ctx["tdm_last_sync"] = prospect.tdm_documents.aggregate(
+                Max("last_checked_at")
+            )["last_checked_at__max"]
+        else:
+            ctx["prospect_docs"] = []
+            ctx["all_tdm"] = []
+            ctx["tdm_last_sync"] = None
+        return ctx
+
+
+# -------------------- Digital Folder endpoints --------------------
+
+def _user_can_modify_case_documents(user, case):
+    if not hasattr(user, "profile"):
+        return False
+    return user.profile.is_admin or (case.assigned_to and case.assigned_to == user)
+
+
+@login_required
+@require_http_methods(["GET"])
+def case_documents_list_v2(request, pk):
+    case = get_object_or_404(Case, pk=pk)
+    if not (hasattr(request.user, "profile") and (request.user.profile.can_view_cases or request.user.profile.is_admin)):
+        return HttpResponseForbidden()
+    docs = case.documents.all().select_related("uploaded_by").prefetch_related("notes__created_by")
+    html = render_to_string(
+        "cases/_documents_content_v2.html", {"docs": docs, "object": case}, request=request
+    )
+    return HttpResponse(html)
+
+
+@login_required
+@require_http_methods(["POST"])
+def case_documents_upload(request, pk):
+    case = get_object_or_404(Case, pk=pk)
+    if not _user_can_modify_case_documents(request.user, case):
+        return HttpResponseForbidden("permission denied")
+    files = request.FILES.getlist("files")
+    if not files:
+        return JsonResponse({"error": "No files provided"}, status=400)
+    created = []
+    for f in files:
+        doc = case.documents.create(
+            file=f,
+            name=getattr(f, "name", "") or "",
+            uploaded_by=request.user,
+            size=getattr(f, "size", None) or None,
+            content_type=getattr(f, "content_type", "") or "",
+        )
+        created.append({"id": doc.pk, "name": doc.name or doc.filename()})
+    return JsonResponse({"created": created}, status=201)
+
+
+@login_required
+@require_http_methods(["POST"])
+def case_documents_delete(request, pk):
+    case = get_object_or_404(Case, pk=pk)
+    if not _user_can_modify_case_documents(request.user, case):
+        return HttpResponseForbidden("permission denied")
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+        ids = payload.get("ids") or []
+    except Exception:
+        return JsonResponse({"error": "Invalid JSON payload"}, status=400)
+    if not isinstance(ids, list) or not ids:
+        return JsonResponse({"error": "No ids provided"}, status=400)
+    deleted = []
+    for doc in case.documents.filter(pk__in=ids):
+        try:
+            doc.file.delete(save=False)
+        except Exception:
+            pass
+        doc.delete()
+        deleted.append(doc.pk)
+    return JsonResponse({"deleted": deleted})
+
+
+@login_required
+@require_http_methods(["GET"])
+def case_document_download(request, pk, doc_pk):
+    case = get_object_or_404(Case, pk=pk)
+    doc = get_object_or_404(case.documents, pk=doc_pk)
+    if not (hasattr(request.user, "profile") and (
+        request.user.profile.can_view_cases
+        or request.user.profile.is_admin
+        or doc.uploaded_by == request.user
+    )):
+        return HttpResponseForbidden()
+    try:
+        fh = doc.file.open("rb")
+        return FileResponse(fh, as_attachment=True, filename=doc.filename())
+    except Exception:
+        return HttpResponse(status=404)
+
+
+@login_required
+@require_http_methods(["POST"])
+def case_document_add_note(request, pk, doc_pk):
+    case = get_object_or_404(Case, pk=pk)
+    if not (hasattr(request.user, "profile") and (request.user.profile.can_view_cases or request.user.profile.is_admin)):
+        return HttpResponseForbidden("permission denied")
+    doc = get_object_or_404(case.documents, pk=doc_pk)
+    content = (request.POST.get("content") or "").strip()
+    if not content:
+        return JsonResponse({"error": "Content required"}, status=400)
+    note = doc.notes.create(content=content, created_by=request.user)
+    return JsonResponse({
+        "created": True,
+        "note": {
+            "id": note.pk,
+            "content": note.content,
+            "created_by": note.created_by.get_full_name() or note.created_by.username,
+            "created_at": note.created_at.strftime("%Y-%m-%d %H:%M"),
+        },
+    })
+
+
+@login_required
+@require_http_methods(["POST"])
+def case_document_delete_note(request, pk, doc_pk, note_pk):
+    case = get_object_or_404(Case, pk=pk)
+    if not (hasattr(request.user, "profile") and request.user.profile.is_admin):
+        return HttpResponseForbidden("permission denied")
+    doc = get_object_or_404(case.documents, pk=doc_pk)
+    note = get_object_or_404(doc.notes, pk=note_pk)
+    note.delete()
+    return JsonResponse({"deleted": True})

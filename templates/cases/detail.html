@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Case {{ object.case_number|default:object.pk }}{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -18,6 +19,13 @@
   </div>
 </div>
 <div class="mt-2">
+  <a href="{% url 'cases:documents_page' object.pk %}" target="_blank" rel="noopener"
+     class="btn btn-outline-success btn-sm me-1">
+    <i class="bi bi-folder2-open"></i> Digital Folder
+    {% with total=object.documents.count %}
+    {% if total %}<span class="badge rounded-pill bg-success ms-1">{{ total }}</span>{% endif %}
+    {% endwith %}
+  </a>
   <a href="{% url 'cases:autodialer' object.pk %}" class="btn btn-outline-secondary btn-sm me-1">
     <i class="bi bi-telephone"></i> Autodialer
   </a>
@@ -82,24 +90,9 @@
     </div>
     {% endif %}
 
-    {% if tdm_downloaded_docs %}
-    <div class="card mb-3">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <strong><i class="bi bi-file-earmark-check me-1"></i> TDM Documents</strong>
-        {% if tdm_last_sync %}<small class="text-muted fw-normal" style="font-size:.75rem;">Synced {{ tdm_last_sync|date:"m/d/Y H:i" }}</small>{% endif %}
-      </div>
-      <ul class="list-group list-group-flush">
-        {% for doc in tdm_downloaded_docs %}
-        <li class="list-group-item py-1 px-3 small">
-          <a href="{% url 'prospects:tdm_document_open' object.prospect.pk doc.pk %}" target="_blank" rel="noopener"
-             class="fw-medium link-primary link-underline-opacity-0 link-underline-opacity-100-hover">
-            <i class="bi bi-file-earmark-pdf me-1 text-danger"></i>{{ doc.title }}
-          </a>
-          <div class="text-muted" style="font-size:.78rem;">{{ doc.downloaded_at|date:"m/d/Y H:i" }}</div>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
+    {# TDM Documents Card — syncs via the prospects app endpoints using prospect.pk #}
+    {% if object.prospect %}
+    {% include "prospects/_tdm_docs_fragment.html" with object=object.prospect tdm_downloaded_docs=tdm_downloaded_docs tdm_last_sync=tdm_last_sync %}
     {% endif %}
   </div>
 
@@ -157,5 +150,105 @@
     </div>
   </div>
 </div>
+
+
+<script>
+(function () {
+  'use strict';
+
+  function getCsrf() {
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  function tdmSyncInit() {
+    var btn = document.getElementById('sync-tdm-btn');
+    if (!btn) return;
+
+    var statusEl = document.getElementById('tdm-sync-status');
+
+    function setStatus(msg, cls) {
+      statusEl.className = 'small ' + (cls || 'text-muted');
+      statusEl.textContent = msg;
+    }
+
+    function resetBtn(b) {
+      b.disabled = false;
+      b.innerHTML = '<i class="bi bi-arrow-repeat"></i> Sync TDM';
+    }
+
+    function poll(b, statusUrl, fragmentUrl) {
+      fetch(statusUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.state === 'running') {
+            setStatus('Syncing\u2026', 'text-info');
+            setTimeout(function () { poll(b, statusUrl, fragmentUrl); }, 3000);
+          } else if (data.state === 'completed') {
+            var r = data.result || {};
+            var newDocs = r.new_docs || 0;
+            setStatus(
+              'Done \u2014 ' + newDocs + ' new, ' + (r.downloaded || 0) + ' downloaded',
+              newDocs > 0 ? 'text-success' : 'text-muted'
+            );
+            resetBtn(b);
+            fetch(fragmentUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+              .then(function (r2) { return r2.text(); })
+              .then(function (html) {
+                var card = document.getElementById('tdm-docs-card');
+                if (!card) return;
+                var tmp = document.createElement('div');
+                tmp.innerHTML = html;
+                var newCard = tmp.firstElementChild;
+                card.replaceWith(newCard);
+                tdmSyncInit();
+              });
+          } else if (data.state === 'failed') {
+            setStatus('Sync failed: ' + (data.error || 'unknown error'), 'text-danger');
+            resetBtn(b);
+          }
+        })
+        .catch(function () {
+          setStatus('Status check failed.', 'text-danger');
+          resetBtn(b);
+        });
+    }
+
+    btn.addEventListener('click', function () {
+      var b = this;
+      b.disabled = true;
+      b.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Syncing\u2026';
+      setStatus('Starting\u2026', 'text-info');
+
+      var syncUrl     = b.dataset.syncUrl;
+      var statusUrl   = b.dataset.statusUrl;
+      var fragmentUrl = b.dataset.fragmentUrl;
+
+      fetch(syncUrl, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getCsrf(),
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.started) {
+            poll(b, statusUrl, fragmentUrl);
+          } else {
+            setStatus(data.error || 'Could not start sync.', 'text-warning');
+            resetBtn(b);
+          }
+        })
+        .catch(function () {
+          setStatus('Request failed.', 'text-danger');
+          resetBtn(b);
+        });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', tdmSyncInit);
+})();
+</script>
 
 {% endblock %}

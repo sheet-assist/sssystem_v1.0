@@ -280,6 +280,19 @@ class NavigationFlowTest(ProspectTestMixin, TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "2024-001234")
 
+    def test_prospect_detail_uses_county_url_fallbacks(self):
+        self.county.auction_calendar_url = "https://county.example/ac"
+        self.county.realtdm_url = "https://county.example/tdm"
+        self.county.save(update_fields=["auction_calendar_url", "realtdm_url"])
+        self.prospect.ack_url = ""
+        self.prospect.tdm_url = ""
+        self.prospect.save(update_fields=["ack_url", "tdm_url"])
+
+        resp = self.client.get(f"/prospects/detail/{self.prospect.pk}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "https://county.example/ac")
+        self.assertContains(resp, "https://county.example/tdm")
+
     def test_prospect_list_filters(self):
         # Create a disqualified prospect
         Prospect.objects.create(
@@ -292,6 +305,86 @@ class NavigationFlowTest(ProspectTestMixin, TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "2024-001234")
         self.assertNotContains(resp, "2024-DQ")
+
+    def test_prospect_list_sort_case_number_desc(self):
+        Prospect.objects.create(
+            prospect_type="TD",
+            case_number="A-0001",
+            county=self.county,
+            auction_date=date(2024, 6, 14),
+            qualification_status="qualified",
+        )
+        Prospect.objects.create(
+            prospect_type="TD",
+            case_number="Z-9999",
+            county=self.county,
+            auction_date=date(2024, 6, 13),
+            qualification_status="qualified",
+        )
+        resp = self.client.get("/prospects/browse/TD/FL/miami-dade/?sort=case_number&dir=desc&qualification_status=qualified")
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        self.assertLess(content.find("Z-9999"), content.find("A-0001"))
+
+    def test_type_select_sort_case_number_desc(self):
+        Prospect.objects.create(
+            prospect_type="TD",
+            case_number="A-TYPE-1",
+            county=self.county,
+            auction_date=date(2024, 6, 12),
+            qualification_status="qualified",
+        )
+        Prospect.objects.create(
+            prospect_type="TD",
+            case_number="Z-TYPE-9",
+            county=self.county,
+            auction_date=date(2024, 6, 11),
+            qualification_status="qualified",
+        )
+        resp = self.client.get("/prospects/?sort=case_number&dir=desc&prospect_type=TD&qualification_status=qualified")
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        self.assertLess(content.find("Z-TYPE-9"), content.find("A-TYPE-1"))
+
+    def test_state_select_sort_case_number_desc(self):
+        Prospect.objects.create(
+            prospect_type="TD",
+            case_number="A-STATE-1",
+            county=self.county,
+            auction_date=date(2024, 6, 10),
+            qualification_status="qualified",
+        )
+        Prospect.objects.create(
+            prospect_type="TD",
+            case_number="Z-STATE-9",
+            county=self.county,
+            auction_date=date(2024, 6, 9),
+            qualification_status="qualified",
+        )
+        resp = self.client.get("/prospects/browse/TD/?sort=case_number&dir=desc&qualification_status=qualified")
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        self.assertLess(content.find("Z-STATE-9"), content.find("A-STATE-1"))
+
+    def test_county_select_sort_case_number_desc(self):
+        Prospect.objects.create(
+            prospect_type="TD",
+            case_number="A-COUNTY-1",
+            county=self.county,
+            auction_date=date(2024, 6, 8),
+            qualification_status="qualified",
+        )
+        Prospect.objects.create(
+            prospect_type="TD",
+            case_number="Z-COUNTY-9",
+            county=self.county,
+            auction_date=date(2024, 6, 7),
+            qualification_status="qualified",
+        )
+        resp = self.client.get("/prospects/browse/TD/FL/?sort=case_number&dir=desc&qualification_status=qualified")
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        self.assertLess(content.find("Z-COUNTY-9"), content.find("A-COUNTY-1"))
 
     def test_prospect_list_defaults_to_qualified(self):
         # When no qualification_status is supplied, the list should default to showing qualified prospects

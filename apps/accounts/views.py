@@ -1,14 +1,17 @@
 from django.contrib import messages
 from django.contrib.auth import logout
+from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from django.views import View
-from django.views.generic import TemplateView, ListView, UpdateView
+from django.views.generic import TemplateView, ListView, UpdateView, CreateView
 
 from .mixins import AdminRequiredMixin
 from .models import UserProfile
-from .forms import UserProfileForm
+from .forms import UserProfileForm, UserCreateForm
+
+User = get_user_model()
 
 
 class ProfileView(LoginRequiredMixin, TemplateView):
@@ -64,6 +67,18 @@ class UserUpdateView(AdminRequiredMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, f"User {self.object.user.username} updated successfully.")
         return super().form_valid(form)
+
+
+class UserCreateView(AdminRequiredMixin, CreateView):
+    model = User
+    form_class = UserCreateForm
+    template_name = "accounts/user_create.html"
+    success_url = reverse_lazy("accounts:user_list")
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f"User {self.object.username} created successfully.")
+        return response
 
 
 class LogoutView(View):

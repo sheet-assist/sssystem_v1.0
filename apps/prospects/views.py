@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, ListView, TemplateView
 from django_filters.views import FilterView
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden, FileResponse, HttpResponse
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 from django.contrib.auth.decorators import login_required
 from django.template.loader import render_to_string
 import json
@@ -159,6 +159,63 @@ def _annotate_ars_calculations(qs):
         )
     )
 
+
+PROSPECT_TABLE_ALLOWED_SORTS = {
+    "case_number",
+    "auction_date",
+    "surplus_amount",
+    "qualification_status",
+    "workflow_status",
+    "assigned_to",
+}
+
+
+def _get_prospect_table_sort(request, allowed_sorts=None, default_sort="auction_date"):
+    allowed = allowed_sorts or PROSPECT_TABLE_ALLOWED_SORTS
+    sort = (request.GET.get("sort") or default_sort).strip()
+    if sort not in allowed:
+        sort = default_sort
+    direction = (request.GET.get("dir") or "asc").strip().lower()
+    if direction not in {"asc", "desc"}:
+        direction = "asc"
+    return sort, direction
+
+
+def _get_prospect_table_ordering(sort, direction):
+    is_desc = direction == "desc"
+    tie_breaker = "-created_at" if is_desc else "created_at"
+
+    if sort == "auction_date":
+        primary = F("auction_date").desc(nulls_last=True) if is_desc else F("auction_date").asc(nulls_last=True)
+        return [primary, tie_breaker]
+    if sort == "surplus_amount":
+        primary = F("surplus_amount").desc(nulls_last=True) if is_desc else F("surplus_amount").asc(nulls_last=True)
+        return [primary, tie_breaker]
+    if sort == "case_number":
+        return ["-case_number" if is_desc else "case_number", tie_breaker]
+    if sort == "qualification_status":
+        return ["-qualification_status" if is_desc else "qualification_status", tie_breaker]
+    if sort == "workflow_status":
+        return ["-workflow_status" if is_desc else "workflow_status", tie_breaker]
+    if sort == "assigned_to":
+        primary = F("assigned_to__username").desc(nulls_last=True) if is_desc else F("assigned_to__username").asc(nulls_last=True)
+        return [primary, tie_breaker]
+    return [F("auction_date").asc(nulls_last=True), "created_at"]
+
+
+def _build_prospect_sort_context(request, sort, direction, columns):
+    sort_urls = {}
+    active_dirs = {}
+    for col in columns:
+        qd = request.GET.copy()
+        next_dir = "desc" if (sort == col and direction == "asc") else "asc"
+        qd["sort"] = col
+        qd["dir"] = next_dir
+        qd.pop("page", None)
+        sort_urls[col] = f"?{qd.urlencode()}"
+        active_dirs[col] = direction if sort == col else ""
+    return sort_urls, active_dirs
+
 class TypeSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, TemplateView):
     template_name = "prospects/type_select.html"
     export_filename_prefix = "prospects_type"
@@ -190,6 +247,7 @@ class TypeSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, TemplateVie
                 "total_revenue": ((type_stats.get(code, {}).get("total_surplus") or 0) * ss_revenue_tier / 100),
             }
             for code, label in Prospect.PROSPECT_TYPES
+            if type_stats.get(code, {}).get("total_count", 0) > 0
         ]
         type_codes = {code for code, _label in Prospect.PROSPECT_TYPES}
         selected_type = (self.request.GET.get("prospect_type") or "").upper()
@@ -208,14 +266,14 @@ class TypeSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, TemplateVie
         if can_view_revenue:
             filtered_qs = _annotate_revenue(filtered_qs, ss_revenue_tier)
             filtered_qs = _annotate_ars_calculations(filtered_qs)
-        filtered_prospects = filtered_qs.order_by(
-            F("auction_date").asc(nulls_last=True),
-            "created_at",
-        )
+        sort_columns = ["case_number", "auction_date", "surplus_amount", "qualification_status", "workflow_status", "assigned_to"]
+        sort, direction = _get_prospect_table_sort(self.request, allowed_sorts=set(sort_columns))
+        filtered_prospects = filtered_qs.order_by(*_get_prospect_table_ordering(sort, direction))
         paginator = Paginator(filtered_prospects, 25)
         page_obj = paginator.get_page(self.request.GET.get("page"))
         has_active_filters = any(k != "page" and bool(v) for k, v in self.request.GET.items())
         filtered_surplus = prospect_filter.qs.filter(qualification_status="qualified").aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
+        sort_urls, active_dirs = _build_prospect_sort_context(self.request, sort, direction, sort_columns)
 
         ctx["selected_prospect_type"] = selected_type
         ctx["filter"] = prospect_filter
@@ -229,6 +287,10 @@ class TypeSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, TemplateVie
         ctx["filtered_revenue"] = (filtered_surplus * ss_revenue_tier / 100) if can_view_revenue else 0
         ctx["can_view_revenue"] = can_view_revenue
         ctx["ss_revenue_tier"] = ss_revenue_tier
+        ctx["current_sort"] = sort
+        ctx["current_sort_dir"] = direction
+        ctx["sort_urls"] = sort_urls
+        ctx["active_sort_dirs"] = active_dirs
         return ctx
 
 
@@ -316,14 +378,14 @@ class StateSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, ListView):
         if can_view_revenue:
             filtered_qs = _annotate_revenue(filtered_qs, ss_revenue_tier)
             filtered_qs = _annotate_ars_calculations(filtered_qs)
-        filtered_prospects = filtered_qs.order_by(
-            F("auction_date").asc(nulls_last=True),
-            "created_at",
-        )
+        sort_columns = ["case_number", "auction_date", "surplus_amount", "qualification_status", "workflow_status"]
+        sort, direction = _get_prospect_table_sort(self.request, allowed_sorts=set(sort_columns))
+        filtered_prospects = filtered_qs.order_by(*_get_prospect_table_ordering(sort, direction))
         paginator = Paginator(filtered_prospects, 25)
         page_obj = paginator.get_page(self.request.GET.get("page"))
         has_active_filters = any(k != "page" and bool(v) for k, v in self.request.GET.items())
         filtered_surplus = prospect_filter.qs.filter(qualification_status="qualified").aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
+        sort_urls, active_dirs = _build_prospect_sort_context(self.request, sort, direction, sort_columns)
 
         ctx["filter"] = prospect_filter
         ctx["prospect_list"] = page_obj.object_list
@@ -336,6 +398,10 @@ class StateSelectView(ProspectsAccessMixin, ProspectExcelExportMixin, ListView):
         ctx["filtered_revenue"] = (filtered_surplus * ss_revenue_tier / 100) if can_view_revenue else 0
         ctx["can_view_revenue"] = can_view_revenue
         ctx["ss_revenue_tier"] = ss_revenue_tier
+        ctx["current_sort"] = sort
+        ctx["current_sort_dir"] = direction
+        ctx["sort_urls"] = sort_urls
+        ctx["active_sort_dirs"] = active_dirs
         return ctx
 
 
@@ -403,14 +469,14 @@ class CountySelectView(ProspectsAccessMixin, ProspectExcelExportMixin, ListView)
         if can_view_revenue:
             filtered_qs = _annotate_revenue(filtered_qs, ss_revenue_tier)
             filtered_qs = _annotate_ars_calculations(filtered_qs)
-        filtered_prospects = filtered_qs.order_by(
-            F("auction_date").asc(nulls_last=True),
-            "created_at",
-        )
+        sort_columns = ["case_number", "auction_date", "surplus_amount", "qualification_status", "workflow_status"]
+        sort, direction = _get_prospect_table_sort(self.request, allowed_sorts=set(sort_columns))
+        filtered_prospects = filtered_qs.order_by(*_get_prospect_table_ordering(sort, direction))
         paginator = Paginator(filtered_prospects, 25)
         page_obj = paginator.get_page(self.request.GET.get("page"))
         has_active_filters = any(k != "page" and bool(v) for k, v in self.request.GET.items())
         filtered_surplus = prospect_filter.qs.filter(qualification_status="qualified").aggregate(total_surplus=Sum("surplus_amount"))["total_surplus"] or 0
+        sort_urls, active_dirs = _build_prospect_sort_context(self.request, sort, direction, sort_columns)
 
         ctx["filter"] = prospect_filter
         ctx["prospect_list"] = page_obj.object_list
@@ -423,6 +489,10 @@ class CountySelectView(ProspectsAccessMixin, ProspectExcelExportMixin, ListView)
         ctx["filtered_revenue"] = (filtered_surplus * ss_revenue_tier / 100) if can_view_revenue else 0
         ctx["can_view_revenue"] = can_view_revenue
         ctx["ss_revenue_tier"] = ss_revenue_tier
+        ctx["current_sort"] = sort
+        ctx["current_sort_dir"] = direction
+        ctx["sort_urls"] = sort_urls
+        ctx["active_sort_dirs"] = active_dirs
         return ctx
 
 
@@ -432,6 +502,58 @@ class ProspectListView(ProspectsAccessMixin, ProspectExcelExportMixin, FilterVie
     filterset_class = ProspectFilter
     paginate_by = 25
     export_filename_prefix = "prospects_list"
+    ALLOWED_SORTS = {
+        "case_number",
+        "auction_date",
+        "surplus_amount",
+        "qualification_status",
+        "workflow_status",
+        "assigned_to",
+    }
+
+    def _get_sort(self):
+        sort = (self.request.GET.get("sort") or "auction_date").strip()
+        if sort not in self.ALLOWED_SORTS:
+            sort = "auction_date"
+        direction = (self.request.GET.get("dir") or "asc").strip().lower()
+        if direction not in {"asc", "desc"}:
+            direction = "asc"
+        return sort, direction
+
+    def _get_ordering(self, sort, direction):
+        is_desc = direction == "desc"
+        tie_breaker = "-created_at" if is_desc else "created_at"
+
+        if sort == "auction_date":
+            primary = F("auction_date").desc(nulls_last=True) if is_desc else F("auction_date").asc(nulls_last=True)
+            return [primary, tie_breaker]
+        if sort == "surplus_amount":
+            primary = F("surplus_amount").desc(nulls_last=True) if is_desc else F("surplus_amount").asc(nulls_last=True)
+            return [primary, tie_breaker]
+        if sort == "case_number":
+            return ["-case_number" if is_desc else "case_number", tie_breaker]
+        if sort == "qualification_status":
+            return ["-qualification_status" if is_desc else "qualification_status", tie_breaker]
+        if sort == "workflow_status":
+            return ["-workflow_status" if is_desc else "workflow_status", tie_breaker]
+        if sort == "assigned_to":
+            primary = F("assigned_to__username").desc(nulls_last=True) if is_desc else F("assigned_to__username").asc(nulls_last=True)
+            return [primary, tie_breaker]
+        return [F("auction_date").asc(nulls_last=True), "created_at"]
+
+    def _build_sort_context(self, sort, direction):
+        columns = ["case_number", "auction_date", "surplus_amount", "qualification_status", "workflow_status", "assigned_to"]
+        sort_urls = {}
+        active_dirs = {}
+        for col in columns:
+            qd = self.request.GET.copy()
+            next_dir = "desc" if (sort == col and direction == "asc") else "asc"
+            qd["sort"] = col
+            qd["dir"] = next_dir
+            qd.pop("page", None)
+            sort_urls[col] = f"?{qd.urlencode()}"
+            active_dirs[col] = direction if sort == col else ""
+        return sort_urls, active_dirs
 
     def get_queryset(self):
         qs = super().get_queryset().select_related("county", "county__state", "assigned_to")
@@ -446,7 +568,8 @@ class ProspectListView(ProspectsAccessMixin, ProspectExcelExportMixin, FilterVie
             qs = qs.filter(county__state__abbreviation__iexact=state)
         if county_slug:
             qs = qs.filter(county__slug=county_slug)
-        return qs.order_by(F("auction_date").asc(nulls_last=True), "created_at")
+        sort, direction = self._get_sort()
+        return qs.order_by(*self._get_ordering(sort, direction))
 
     def get_filterset_kwargs(self, filterset_class):
         """Inject a default qualification_status=qualified when no qualification filter is provided.
@@ -486,6 +609,12 @@ class ProspectListView(ProspectsAccessMixin, ProspectExcelExportMixin, FilterVie
         ctx["ss_revenue_tier"] = _get_ss_revenue_tier()
         if self.kwargs.get("county"):
             ctx["county_obj"] = County.objects.filter(slug=self.kwargs["county"]).first()
+        sort, direction = self._get_sort()
+        sort_urls, active_dirs = self._build_sort_context(sort, direction)
+        ctx["current_sort"] = sort
+        ctx["current_sort_dir"] = direction
+        ctx["sort_urls"] = sort_urls
+        ctx["active_sort_dirs"] = active_dirs
 
         # --- aggregate stats for the current filtered queryset ---
         # Use the filtered queryset from the active FilterSet (available as `filter` in context)
@@ -510,6 +639,108 @@ class ProspectListView(ProspectsAccessMixin, ProspectExcelExportMixin, FilterVie
         return ctx
 
 
+_PROSPECT_ACTION_MAP = {
+    "qualified":         ("Qualified",           "success",   "bi-check-circle-fill"),
+    "disqualified":      ("Disqualified",        "danger",    "bi-x-circle-fill"),
+    "assigned":          ("Assigned",            "info",      "bi-person-check-fill"),
+    "status_changed":    ("Workflow Changed",    "secondary", "bi-arrow-right-circle-fill"),
+    "converted_to_case": ("Converted to Case",  "purple",    "bi-arrow-up-circle-fill"),
+    "email_sent":        ("Email Sent",          "warning",   "bi-envelope-fill"),
+}
+
+_CASE_ACTION_MAP = {
+    "closed_won":  ("Case Closed Won",  "success", "bi-trophy-fill"),
+    "closed_lost": ("Case Closed Lost", "danger",  "bi-x-octagon-fill"),
+}
+
+
+def _build_lifecycle_timeline(prospect):
+    if prospect is None:
+        return []
+
+    events = []
+
+    # Prospect created
+    events.append({
+        "date": prospect.created_at,
+        "phase": "prospect",
+        "event_type": "prospect_created",
+        "label": "Prospect Created",
+        "description": str(prospect),
+        "actor": "System",
+        "icon": "bi-plus-circle-fill",
+        "color": "primary",
+    })
+
+    # Prospect action logs
+    for log in prospect.action_logs.filter(
+        action_type__in=_PROSPECT_ACTION_MAP
+    ).order_by("created_at").select_related("user"):
+        label, color, icon = _PROSPECT_ACTION_MAP[log.action_type]
+        events.append({
+            "date": log.created_at,
+            "phase": "prospect",
+            "event_type": log.action_type,
+            "label": label,
+            "description": log.description,
+            "actor": str(log.user) if log.user else "System",
+            "icon": icon,
+            "color": color,
+        })
+
+    # Case phase
+    if hasattr(prospect, "case") and prospect.case:
+        case = prospect.case
+
+        events.append({
+            "date": case.created_at,
+            "phase": "case",
+            "event_type": "case_created",
+            "label": "Case Created",
+            "description": f"Case #{case.case_number}" if case.case_number else "",
+            "actor": "System",
+            "icon": "bi-folder2-open",
+            "color": "success",
+        })
+
+        if case.contract_date:
+            from django.utils import timezone as tz
+            import datetime
+            contract_dt = datetime.datetime.combine(
+                case.contract_date, datetime.time.min,
+                tzinfo=tz.get_current_timezone(),
+            )
+            events.append({
+                "date": contract_dt,
+                "phase": "case",
+                "event_type": "contract_signed",
+                "label": "Contract Signed",
+                "description": "",
+                "actor": "System",
+                "icon": "bi-file-earmark-check-fill",
+                "color": "teal",
+            })
+
+        for log in case.action_logs.order_by("created_at").select_related("user"):
+            label, color, icon = _CASE_ACTION_MAP.get(
+                log.action_type,
+                ("Case Status Change", "secondary", "bi-arrow-right-circle-fill"),
+            )
+            events.append({
+                "date": log.created_at,
+                "phase": "case",
+                "event_type": log.action_type,
+                "label": label,
+                "description": log.description,
+                "actor": str(log.user) if log.user else "System",
+                "icon": icon,
+                "color": color,
+            })
+
+    events.sort(key=lambda e: e["date"])
+    return events
+
+
 class ProspectDetailView(ProspectsAccessMixin, DetailView):
     model = Prospect
     template_name = "prospects/detail.html"
@@ -522,6 +753,7 @@ class ProspectDetailView(ProspectsAccessMixin, DetailView):
             "action_logs__user",
             "rule_notes__created_by",
             "tdm_documents",
+            "case__action_logs__user",
         )
 
     def get_context_data(self, **kwargs):
@@ -529,6 +761,7 @@ class ProspectDetailView(ProspectsAccessMixin, DetailView):
         ctx = super().get_context_data(**kwargs)
         ctx["tdm_downloaded_docs"] = self.object.tdm_documents.filter(is_downloaded=True)
         ctx["tdm_last_sync"] = self.object.tdm_documents.aggregate(Max("last_checked_at"))["last_checked_at__max"]
+        ctx["timeline"] = _build_lifecycle_timeline(self.object)
         return ctx
 
 
@@ -1057,5 +1290,43 @@ class ProspectCaseCalendarView(ProspectsAccessMixin, TemplateView):
                 current_week = []
         return weeks
 
+
+# -------------------- TDM On-Demand Sync endpoints --------------------
+
+@login_required
+@require_POST
+def prospect_tdm_sync(request, pk):
+    """POST: start a background TDM document sync for a single prospect."""
+    from apps.scraper.services.tdm_sync_service import start_tdm_sync
+    prospect = get_object_or_404(Prospect, pk=pk)
+    if not prospect.case_number:
+        return JsonResponse({"error": "No case number on this prospect."}, status=400)
+    started = start_tdm_sync(prospect.pk)
+    if not started:
+        return JsonResponse({"error": "Sync already running."}, status=409)
+    return JsonResponse({"started": True})
+
+
+@login_required
+def prospect_tdm_sync_status(request, pk):
+    """GET: return the current sync status for a prospect (for polling)."""
+    from apps.scraper.services.tdm_sync_service import get_sync_status
+    prospect = get_object_or_404(Prospect, pk=pk)
+    return JsonResponse(get_sync_status(prospect.pk))
+
+
+@login_required
+def prospect_tdm_docs_fragment(request, pk):
+    """GET: render the TDM Documents card partial for in-place DOM refresh."""
+    prospect = get_object_or_404(
+        Prospect.objects.prefetch_related("tdm_documents"), pk=pk
+    )
+    downloaded = prospect.tdm_documents.filter(is_downloaded=True)
+    last_sync = prospect.tdm_documents.aggregate(Max("last_checked_at"))["last_checked_at__max"]
+    return render(request, "prospects/_tdm_docs_fragment.html", {
+        "object": prospect,
+        "tdm_downloaded_docs": downloaded,
+        "tdm_last_sync": last_sync,
+    })
 
 

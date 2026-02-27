@@ -31,7 +31,16 @@
 <div class="card">
   <div class="card-header fw-semibold py-2 d-flex justify-content-between align-items-center">
     <span><i class="bi bi-cloud-download me-1"></i> TDM Auto-Sync Documents <span class="badge bg-secondary ms-1">{{ all_tdm|length }}</span></span>
-    {% if tdm_last_sync %}<small class="text-muted fw-normal" style="font-size:.75rem;">Last synced {{ tdm_last_sync|date:"m/d/Y H:i" }}</small>{% endif %}
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span id="tdm-sync-status-v2" class="small text-muted"></span>
+      {% if tdm_last_sync %}<small class="text-muted fw-normal" style="font-size:.75rem;">Last synced {{ tdm_last_sync|date:"m/d/Y H:i" }}</small>{% endif %}
+      <button id="sync-tdm-btn-v2"
+              class="btn btn-outline-primary btn-sm"
+              data-sync-url="{% url 'prospects:tdm_sync' object.pk %}"
+              data-status-url="{% url 'prospects:tdm_sync_status' object.pk %}">
+        <i class="bi bi-arrow-repeat"></i> Sync TDM
+      </button>
+    </div>
   </div>
   <div class="card-body p-0">
 
@@ -105,4 +114,89 @@
 {% endwith %}
 
 <script src="{% static 'js/prospect_documents_v2.js' %}"></script>
+<script>
+(function () {
+  'use strict';
+
+  var btn = document.getElementById('sync-tdm-btn-v2');
+  if (!btn) return;
+
+  var statusEl = document.getElementById('tdm-sync-status-v2');
+
+  function getCsrf() {
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  function setStatus(msg, cls) {
+    statusEl.className = 'small ' + (cls || 'text-muted');
+    statusEl.textContent = msg;
+  }
+
+  function resetBtn() {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Sync TDM';
+  }
+
+  function poll(statusUrl) {
+    fetch(statusUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.state === 'running') {
+          setStatus('Syncing\u2026', 'text-info');
+          setTimeout(function () { poll(statusUrl); }, 3000);
+        } else if (data.state === 'completed') {
+          var r = data.result || {};
+          var newDocs = r.new_docs || 0;
+          setStatus(
+            'Done \u2014 ' + newDocs + ' new, ' + (r.downloaded || 0) + ' downloaded',
+            newDocs > 0 ? 'text-success' : 'text-muted'
+          );
+          resetBtn();
+          // Reload the page so the updated doc list is visible
+          if (newDocs > 0 || r.downloaded > 0) {
+            setTimeout(function () { window.location.reload(); }, 1200);
+          }
+        } else if (data.state === 'failed') {
+          setStatus('Sync failed: ' + (data.error || 'unknown error'), 'text-danger');
+          resetBtn();
+        }
+      })
+      .catch(function () {
+        setStatus('Status check failed.', 'text-danger');
+        resetBtn();
+      });
+  }
+
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Syncing\u2026';
+    setStatus('Starting\u2026', 'text-info');
+
+    var syncUrl   = btn.dataset.syncUrl;
+    var statusUrl = btn.dataset.statusUrl;
+
+    fetch(syncUrl, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCsrf(),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.started) {
+          poll(statusUrl);
+        } else {
+          setStatus(data.error || 'Could not start sync.', 'text-warning');
+          resetBtn();
+        }
+      })
+      .catch(function () {
+        setStatus('Request failed.', 'text-danger');
+        resetBtn();
+      });
+  });
+})();
+</script>
 {% endblock %}

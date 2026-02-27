@@ -2,6 +2,8 @@
 
 from decimal import Decimal
 
+from django.utils import timezone
+
 from playwright.sync_api import sync_playwright
 
 from apps.prospects.models import Prospect, add_rule_note
@@ -154,6 +156,8 @@ def persist_scraped_data(job, scraped_items):
                     if val not in (None, ""):
                         setattr(prospect, field, val)
                 prospect.raw_data = data.get("raw_data", {})
+                if auction_date >= timezone.localdate():
+                    prospect.qualification_status = "Pending"
                 prospect.save()
                 updated += 1
 

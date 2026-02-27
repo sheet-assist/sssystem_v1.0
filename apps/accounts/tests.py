@@ -101,6 +101,40 @@ class AccessControlTest(TestCase):
         resp = c.get("/accounts/users/")
         self.assertEqual(resp.status_code, 200)
 
+    def test_user_add_accessible_to_admin_and_creates_user(self):
+        admin = User.objects.create_superuser(username="adm_add", password="pass")
+        c = Client()
+        c.login(username="adm_add", password="pass")
+
+        get_resp = c.get("/accounts/users/add/")
+        self.assertEqual(get_resp.status_code, 200)
+
+        post_resp = c.post("/accounts/users/add/", {
+            "username": "newuser1",
+            "first_name": "New",
+            "last_name": "User",
+            "email": "newuser1@example.com",
+            "password1": "StrongPass123!",
+            "password2": "StrongPass123!",
+            "is_active": True,
+            "role": UserProfile.ROLE_BOTH,
+            "phone": "555-1212",
+            "can_manage_finance_settings": True,
+        })
+        self.assertEqual(post_resp.status_code, 302)
+        self.assertTrue(User.objects.filter(username="newuser1").exists())
+        new_user = User.objects.get(username="newuser1")
+        self.assertEqual(new_user.profile.role, UserProfile.ROLE_BOTH)
+
+    def test_user_add_forbidden_for_non_admin(self):
+        user = User.objects.create_user(username="regular_add", password="pass")
+        user.profile.role = UserProfile.ROLE_PROSPECTS_ONLY
+        user.profile.save()
+        c = Client()
+        c.login(username="regular_add", password="pass")
+        resp = c.get("/accounts/users/add/")
+        self.assertEqual(resp.status_code, 403)
+
 
 class DashboardTest(TestCase):
     def setUp(self):

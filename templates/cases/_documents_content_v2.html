@@ -1,0 +1,162 @@
+<div class="mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <div>
+      <label class="form-label mb-0"><strong>Files</strong></label>
+      <div class="small text-muted">Upload multiple files, manage notes, and remove selected documents.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <button id="df2-open-uploader-modal" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-cloud-arrow-up"></i> Upload
+      </button>
+      <button id="deleteSelectedDocsBtnV2" class="btn btn-danger btn-sm" disabled>
+        <i class="bi bi-trash"></i> Delete selected
+      </button>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th style="width:34px;"><input type="checkbox" id="df2-select-all" /></th>
+          <th>File</th>
+          <th style="width:140px;">Uploaded</th>
+          <th style="width:140px;">By</th>
+          <th style="width:320px;" class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for doc in docs %}
+        <tr data-doc-id="{{ doc.pk }}">
+          <td><input type="checkbox" class="df2-select-doc" data-id="{{ doc.pk }}" /></td>
+          <td>
+            <div class="filename">{{ doc.name|default:doc.filename }}</div>
+            {% with latest=doc.notes.all.0 %}
+              {% if latest %}
+                <div class="small text-muted mt-1">
+                  <strong>{% if latest.created_by %}{{ latest.created_by.get_full_name|default:latest.created_by.username }}{% else %}System{% endif %}</strong>
+                  &middot; <small>{{ latest.created_at|date:"m/d/Y H:i" }}</small>
+                  &nbsp;&mdash;&nbsp;{{ latest.content|truncatechars:90 }}
+                </div>
+              {% else %}
+                <div class="small text-muted mt-1">No notes</div>
+              {% endif %}
+            {% endwith %}
+          </td>
+          <td class="text-muted">{{ doc.uploaded_at|date:"m/d/Y H:i" }}</td>
+          <td class="text-muted">{% if doc.uploaded_by %}{{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username }}{% else %}System{% endif %}</td>
+          <td class="text-end">
+            <div class="d-flex gap-2 justify-content-end align-items-center flex-nowrap">
+              <a href="{% url 'cases:document_download' object.pk doc.pk %}" class="btn btn-outline-secondary btn-sm" title="Download">
+                <i class="bi bi-download"></i>
+              </a>
+              <button type="button" class="btn btn-outline-success btn-sm df2-open-add-note" data-id="{{ doc.pk }}" title="Add note">
+                <i class="bi bi-plus-lg"></i> Add note
+              </button>
+              <button type="button" class="btn btn-outline-primary btn-sm df2-view-notes" data-id="{{ doc.pk }}" title="View notes">
+                <i class="bi bi-chat-left-text"></i> Notes
+                {% if doc.notes.count %}
+                <span class="badge rounded-pill bg-primary ms-1">{{ doc.notes.count }}</span>
+                {% endif %}
+              </button>
+              <button type="button" class="btn btn-outline-danger btn-sm df2-delete-single" data-id="{{ doc.pk }}" title="Delete file">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+
+        <template id="df2-notes-template-{{ doc.pk }}">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="fw-semibold">Notes</div>
+            <div class="small text-muted">{{ doc.notes.count }} total</div>
+          </div>
+          <div class="df2-notes-list mb-2">
+            {% for n in doc.notes.all %}
+            <div class="border-bottom pb-2 mb-2{% if forloop.last %} border-bottom-0 pb-0 mb-0{% endif %}">
+              <div class="d-flex justify-content-between">
+                <strong>{% if n.created_by %}{{ n.created_by.get_full_name|default:n.created_by.username }}{% else %}System{% endif %}</strong>
+                <div>
+                  <small class="text-muted">{{ n.created_at|date:"m/d/Y H:i" }}</small>
+                  {% if user.profile.is_admin %}
+                  <button type="button" class="btn btn-sm btn-link text-danger ms-2 df2-delete-note" data-note-id="{{ n.pk }}" data-doc-id="{{ doc.pk }}" title="Delete note">
+                    <i class="bi bi-x-circle"></i>
+                  </button>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="small mt-1">{{ n.content|linebreaksbr }}</div>
+            </div>
+            {% empty %}
+            <div class="text-muted small">No notes yet.</div>
+            {% endfor %}
+          </div>
+        </template>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-muted py-3">No documents yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="modal fade" id="df2UploaderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Upload files</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="df2-modal-uploader" class="border rounded p-3 text-center" style="min-height:140px;">
+            <div class="text-muted" id="df2-modal-drop-instructions">
+              <i class="bi bi-cloud-arrow-up fs-1"></i>
+              <div>Drop files here or <label for="df2-modal-file-input" class="text-decoration-underline" style="cursor:pointer;">browse</label></div>
+              <input id="df2-modal-file-input" type="file" multiple class="d-none" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="df2ViewNotesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Document notes</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="df2-view-notes-body">
+          <div class="text-muted small">No notes found.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-primary" id="df2-open-add-note">
+            <i class="bi bi-plus-lg"></i> Add note
+          </button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="df2AddNoteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Add note</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <textarea id="df2-note-textarea" class="form-control" rows="4" placeholder="Enter note"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="df2-save-note">Save note</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
