@@ -206,7 +206,13 @@
         {% for note in object.notes.all %}
         <div class="border-bottom pb-2 mb-2{% if forloop.last %} border-bottom-0 pb-0 mb-0{% endif %}">
           <div class="d-flex justify-content-between">
-            <strong>{{ note.author.get_full_name|default:note.author.username }}</strong>
+            <strong>
+              {% if note.author %}
+                {{ note.author.get_full_name|default:note.author.username }}
+              {% else %}
+                System
+              {% endif %}
+            </strong>
             <small class="text-muted">{{ note.created_at|date:"m/d/Y H:i" }}</small>
           </div>
           <p class="mb-0 mt-1">{{ note.content|linebreaksbr }}</p>
@@ -481,5 +487,6 @@
 </div>{# /outer row g-3 #}
 
 {% endblock %}
+
 
 

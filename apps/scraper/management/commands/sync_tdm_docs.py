@@ -13,6 +13,7 @@ Usage:
 """
 
 import json
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -39,7 +40,11 @@ from tdm.download_surplus_affidavit_headless import (
 # Constants
 # ---------------------------------------------------------------------------
 
-DOWNLOAD_TITLES = {"Surplus Claim/Affidavit", "COM_SURPLUS", "SURPLUS_LETTER"}
+
+
+DOWNLOAD_TITLES = { "Surplus Claim/Affidavit",
+    "SURPLUS_LETTER",
+    "Title Search",}
 
 BASE_DIR = Path(settings.BASE_DIR)
 MEDIA_ROOT = Path(getattr(settings, "MEDIA_ROOT", BASE_DIR / "media"))
@@ -89,6 +94,17 @@ def resolve_output_path(cfg, config_path):
         p = (Path(config_path).parent / p).resolve()
     return p
 
+
+
+def safe_relative_path(path: Path) -> str:
+    """Return a stable relative path; prefer MEDIA_ROOT-relative for DB storage."""
+    p = Path(path).resolve()
+    for root in (MEDIA_ROOT, BASE_DIR):
+        try:
+            return str(p.relative_to(Path(root).resolve()))
+        except Exception:
+            continue
+    return str(p)
 
 # ---------------------------------------------------------------------------
 # Progress report helpers
@@ -230,6 +246,69 @@ def get_qualified_prospects(cfg):
 # Download helper  — returns (downloaded_count, error_count)
 # ---------------------------------------------------------------------------
 
+
+def _looks_like_pdf(data: bytes) -> bool:
+    if not data:
+        return False
+    return data.lstrip().startswith(b"%PDF-")
+
+
+def _read_starts_with_pdf(path: Path) -> bool:
+    try:
+        with open(path, "rb") as fh:
+            return _looks_like_pdf(fh.read(1024))
+    except Exception:
+        return False
+
+def _resolve_local_file_path(local_path: str) -> Path | None:
+    raw = (local_path or "").strip()
+    if not raw:
+        return None
+
+    normalized = raw.replace("\\", "/")
+    rel = Path(normalized)
+    candidates = []
+
+    raw_path = Path(raw)
+    if raw_path.is_absolute():
+        candidates.append(raw_path)
+
+    candidates.append(MEDIA_ROOT / rel)
+    candidates.append(BASE_DIR / rel)
+
+    if normalized.startswith("media/"):
+        candidates.append(MEDIA_ROOT / Path(normalized[len("media/"):]))
+
+    for candidate in candidates:
+        try:
+            if candidate.exists():
+                return candidate
+        except Exception:
+            continue
+    return None
+
+
+def _try_playwright_download(page, prospect, tdm_doc, dest: Path):
+    """Fallback: capture a browser-managed download instead of request.get bytes."""
+    try:
+        with page.expect_download(timeout=12_000) as dl_info:
+            if not find_and_click_view_button(page, prospect.case_number, tdm_doc.document_id):
+                return False, "View button not found"
+        download = dl_info.value
+        download.save_as(str(dest))
+
+        if _read_starts_with_pdf(dest):
+            return True, ""
+
+        try:
+            dest.unlink()
+        except Exception:
+            pass
+        return False, "Downloaded file is not a PDF"
+    except PlaywrightTimeoutError:
+        return False, "No browser download event"
+    except Exception as exc:
+        return False, str(exc)
 def _download_pending(page, context, prospect, case_id, cfg):
     """Download any eligible docs not yet on disk. Returns (downloaded, errors)."""
     retry_failed = cfg.get("retry_failed", True)
@@ -242,6 +321,22 @@ def _download_pending(page, context, prospect, case_id, cfg):
     )
     if not retry_failed:
         pending_filter["download_error"] = ""
+
+    # Re-queue previously marked downloads if the stored file is missing or not a real PDF.
+    if cfg.get("force_validate_downloaded", True) and not dry_run:
+        downloaded_docs = ProspectTDMDocument.objects.filter(
+            prospect=prospect,
+            is_auto_download=True,
+            is_downloaded=True,
+        )
+        for existing_doc in downloaded_docs:
+            existing_path = _resolve_local_file_path(existing_doc.local_path)
+            if existing_path is not None and _read_starts_with_pdf(existing_path):
+                continue
+
+            existing_doc.is_downloaded = False
+            existing_doc.download_error = "Stored file missing or invalid PDF; re-queued"
+            existing_doc.save(update_fields=["is_downloaded", "download_error", "last_checked_at"])
 
     pending = ProspectTDMDocument.objects.filter(**pending_filter)
     if not pending.exists():
@@ -267,22 +362,29 @@ def _download_pending(page, context, prospect, case_id, cfg):
     dest_dir = MEDIA_ROOT / "prospects" / str(prospect.pk) / "tdm"
     dest_dir.mkdir(parents=True, exist_ok=True)
 
-    for tdm_doc in pending:
+    pending_list = list(pending)
+    for idx, tdm_doc in enumerate(pending_list):
         fname = safe_filename(tdm_doc.filename or tdm_doc.title)
         if not fname.lower().endswith(".pdf"):
             fname += ".pdf"
         dest = dest_dir / fname
 
         if dest.exists():
-            tdm_doc.is_downloaded = True
-            tdm_doc.downloaded_at = datetime.now()
-            tdm_doc.local_path = str(dest.relative_to(BASE_DIR))
-            tdm_doc.download_error = ""
-            tdm_doc.save(update_fields=["is_downloaded", "downloaded_at", "local_path", "download_error", "last_checked_at"])
-            print(f"  [{prospect.case_number}] Already on disk: {fname}")
-            downloaded += 1
-            continue
+            if _read_starts_with_pdf(dest):
+                tdm_doc.is_downloaded = True
+                tdm_doc.downloaded_at = datetime.now()
+                tdm_doc.local_path = safe_relative_path(dest)
+                tdm_doc.download_error = ""
+                tdm_doc.save(update_fields=["is_downloaded", "downloaded_at", "local_path", "download_error", "last_checked_at"])
+                print(f"  [{prospect.case_number}] Already on disk: {fname}")
+                downloaded += 1
+                continue
 
+            try:
+                dest.unlink()
+            except Exception:
+                pass
+            print(f"  [{prospect.case_number}] Existing file is not a PDF, re-downloading: {fname}")
         try:
             pdf_url = None
 
@@ -323,20 +425,44 @@ def _download_pending(page, context, prospect, case_id, cfg):
 
             api_resp = context.request.get(pdf_url, timeout=30_000)
             if api_resp.ok:
-                dest.write_bytes(api_resp.body())
-                tdm_doc.is_downloaded = True
-                tdm_doc.downloaded_at = datetime.now()
-                tdm_doc.local_path = str(dest.relative_to(BASE_DIR))
-                tdm_doc.download_error = ""
-                tdm_doc.save(update_fields=["is_downloaded", "downloaded_at", "local_path", "download_error", "last_checked_at"])
-                print(f"  [{prospect.case_number}] Saved: {fname}")
-                downloaded += 1
+                body = api_resp.body()
+                content_type = (api_resp.headers.get("content-type") or "").lower()
+
+                if _looks_like_pdf(body):
+                    dest.write_bytes(body)
+                    tdm_doc.is_downloaded = True
+                    tdm_doc.downloaded_at = datetime.now()
+                    tdm_doc.local_path = safe_relative_path(dest)
+                    tdm_doc.download_error = ""
+                    tdm_doc.save(update_fields=["is_downloaded", "downloaded_at", "local_path", "download_error", "last_checked_at"])
+                    print(f"  [{prospect.case_number}] Saved: {fname}")
+                    downloaded += 1
+                else:
+                    fallback_ok, fallback_msg = _try_playwright_download(page, prospect, tdm_doc, dest)
+                    if fallback_ok:
+                        tdm_doc.is_downloaded = True
+                        tdm_doc.downloaded_at = datetime.now()
+                        tdm_doc.local_path = safe_relative_path(dest)
+                        tdm_doc.download_error = ""
+                        tdm_doc.save(update_fields=["is_downloaded", "downloaded_at", "local_path", "download_error", "last_checked_at"])
+                        print(f"  [{prospect.case_number}] Saved via browser download: {fname}")
+                        downloaded += 1
+                    else:
+                        tdm_doc.download_error = (
+                            f"Non-PDF response ({content_type or 'unknown content-type'}); "
+                            f"fallback failed: {fallback_msg}"
+                        )
+                        tdm_doc.save(update_fields=["download_error", "last_checked_at"])
+                        print(
+                            f"  [{prospect.case_number}] Non-PDF response for {fname}: "
+                            f"{content_type or 'unknown content-type'}; fallback failed: {fallback_msg}"
+                        )
+                        errors += 1
             else:
                 tdm_doc.download_error = f"HTTP {api_resp.status}"
                 tdm_doc.save(update_fields=["download_error", "last_checked_at"])
                 print(f"  [{prospect.case_number}] HTTP {api_resp.status} for {fname}")
                 errors += 1
-
         except Exception as exc:
             tdm_doc.download_error = str(exc)
             tdm_doc.save(update_fields=["download_error", "last_checked_at"])
@@ -344,6 +470,16 @@ def _download_pending(page, context, prospect, case_id, cfg):
             errors += 1
 
         time.sleep(1)
+
+        # Re-navigate to Documents tab for the next document in the same case.
+        # Clicking View can replace the current page or change the state.
+        if idx < (len(pending_list) - 1):
+            if not navigate_to_documents_tab(page, prospect.case_number, case_id):
+                for remaining in pending_list[idx + 1:]:
+                    remaining.download_error = "Navigation to Documents tab failed"
+                    remaining.save(update_fields=["download_error", "last_checked_at"])
+                    errors += 1
+                break
 
     return downloaded, errors
 
@@ -518,6 +654,11 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Progress report: {output_path}")
 
+        # sync_playwright() creates an asyncio event loop internally; Django's
+        # ORM async_unsafe guard mistakenly thinks we're in an async context.
+        # Setting this env var tells Django to allow synchronous ORM calls here.
+        os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
+
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=headless)
             context = browser.new_context(**BROWSER_ARGS)
@@ -595,3 +736,21 @@ class Command(BaseCommand):
             f"downloaded={s['docs_downloaded']} dl_errors={s['download_errors']} "
             f"scrape_errors={s['scrape_errors']}"
         ))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

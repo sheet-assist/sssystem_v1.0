@@ -10,7 +10,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 BASE_DIR = Path(settings.BASE_DIR)
-DEFAULT_CONFIG_PATH = BASE_DIR / "apps" / "scraper" / "config" / "scrape_config.js"
+DEFAULT_CONFIG_PATH = BASE_DIR / "apps" / "scraper" / "config" / "scrape_config.json"
 DEFAULT_OUTPUT_PATH = BASE_DIR / "apps" / "scraper" / "config" / "output.md"
 
 from apps.locations.models import County, State
@@ -30,7 +30,7 @@ class BackfillTarget:
 
 class Command(BaseCommand):
     help = (
-        "Run county/date backfill scraping from a scrape_config.js file and "
+        "Run county/date backfill scraping from a scrape_config.json file and "
         "continuously update a markdown progress report."
     )
 
@@ -38,7 +38,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--config",
             default=str(DEFAULT_CONFIG_PATH),
-            help="Path to scrape config file (default: apps/scraper/config/scrape_config.js).",
+            help="Path to scrape config JSON file (default: apps/scraper/config/scrape_config.json).",
         )
         parser.add_argument(
             "--output",
@@ -229,24 +229,31 @@ class Command(BaseCommand):
             raise CommandError(f"Config file not found: {config_path}")
 
         raw = config_path.read_text(encoding="utf-8")
-        cleaned = re.sub(r"/\*.*?\*/", "", raw, flags=re.S)
-        cleaned = re.sub(r"^\s*//.*$", "", cleaned, flags=re.M)
 
-        match = re.search(r"\{.*\}", cleaned, flags=re.S)
-        if not match:
-            raise CommandError(
-                "Could not find a JSON object in scrape_config.js. "
-                "Use a JSON object (quoted keys/strings) in the file."
-            )
+        if config_path.suffix.lower() == ".json":
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise CommandError(f"Invalid JSON in {config_path}: {exc}.")
+        else:
+            # Legacy .js support: strip comments and extract the object literal
+            cleaned = re.sub(r"/\*.*?\*/", "", raw, flags=re.S)
+            cleaned = re.sub(r"^\s*//.*$", "", cleaned, flags=re.M)
+            match = re.search(r"\{.*\}", cleaned, flags=re.S)
+            if not match:
+                raise CommandError(
+                    f"Could not find a JSON object in {config_path.name}. "
+                    "Use a JSON object (quoted keys/strings) in the file."
+                )
+            candidate = re.sub(r",(\s*[}\]])", r"\1", match.group(0).strip())
+            try:
+                parsed = json.loads(candidate)
+            except json.JSONDecodeError as exc:
+                raise CommandError(
+                    f"Invalid config JSON in {config_path}: {exc}. "
+                    "Ensure the file uses JSON syntax (double-quoted keys/strings)."
+                )
 
-        candidate = re.sub(r",(\s*[}\]])", r"\1", match.group(0).strip())
-        try:
-            parsed = json.loads(candidate)
-        except json.JSONDecodeError as exc:
-            raise CommandError(
-                f"Invalid config JSON in {config_path}: {exc}. "
-                "Ensure scrape_config.js uses JSON syntax (double-quoted keys/strings)."
-            )
         if not isinstance(parsed, dict):
             raise CommandError(f"Config root must be an object: {config_path}")
         return parsed

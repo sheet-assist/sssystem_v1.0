@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """Download Surplus Claim/Affidavit PDFs from TDM by clicking the View button.
 
 Reads tdm_documents.json, navigates to each case's Documents tab via Playwright,
@@ -64,13 +64,13 @@ def collect_targets(data: list) -> list[dict]:
         case_number = case.get("case_number", "unknown")
         case_id = case.get("case_id", "")
         if not case_id:
-            print(f"[{case_number}] WARNING â€“ no case_id in JSON; re-run scraper first")
+            print(f"[{case_number}] WARNING --- no case_id in JSON; re-run scraper first")
             continue
         for doc in case.get("documents", []):
             if MATCH_KEYWORD in doc.get("title", ""):
                 doc_id = doc.get("document_id", "")
                 if not doc_id:
-                    print(f"[{case_number}] WARNING â€“ '{doc['title']}' has no document_id; re-run scraper first")
+                    print(f"[{case_number}] WARNING --- '{doc['title']}' has no document_id; re-run scraper first")
                     continue
                 targets.append({
                     "case_number": case_number,
@@ -85,13 +85,13 @@ def collect_targets(data: list) -> list[dict]:
 
 def navigate_to_documents_tab(page, case_number: str, case_id: str) -> bool:
     """Navigate to the Documents tab using the same proven flow as the scraper:
-    list page â†’ search â†’ checkbox â†’ batchActions â†’ Documents tab.
+    list page --- search --- checkbox --- batchActions --- Documents tab.
     """
     # 1. Navigate to list page
     try:
         page.goto(BASE_URL, wait_until="domcontentloaded", timeout=30_000)
     except Exception as exc:
-        print(f"[{case_number}] ERROR â€“ navigation failed: {exc}")
+        print(f"[{case_number}] ERROR --- navigation failed: {exc}")
         return False
 
     time.sleep(1)
@@ -103,14 +103,17 @@ def navigate_to_documents_tab(page, case_number: str, case_id: str) -> bool:
         search_input.fill("")
         search_input.type(case_number, delay=50)
     except Exception as exc:
-        print(f"[{case_number}] ERROR â€“ search input: {exc}")
+        print(f"[{case_number}] ERROR --- search input: {exc}")
         return False
 
     # 3. Click Search button
     try:
-        page.locator("button:has-text('Search')").first.click()
+        search_btn = page.locator("button:has-text('Search')").first
+        search_btn.wait_for(state="visible", timeout=5_000)
+        # JS click avoids overlay intercepts that block pointer events in headless
+        search_btn.evaluate("el => el.click()")
     except Exception as exc:
-        print(f"[{case_number}] ERROR â€“ search button: {exc}")
+        print(f"[{case_number}] ERROR --- search button: {exc}")
         return False
 
     time.sleep(2)
@@ -119,10 +122,10 @@ def navigate_to_documents_tab(page, case_number: str, case_id: str) -> bool:
     try:
         page.wait_for_selector("table#county-setup", timeout=10_000)
     except Exception as exc:
-        print(f"[{case_number}] ERROR â€“ results table: {exc}")
+        print(f"[{case_number}] ERROR --- results table: {exc}")
         return False
 
-    # 4b. Check selectedCases checkbox (hidden â€” JS click)
+    # 4b. Check selectedCases checkbox (hidden --- JS click)
     try:
         checkbox = page.locator(
             "table#county-setup tbody tr:first-child input[name='selectedCases']"
@@ -130,7 +133,7 @@ def navigate_to_documents_tab(page, case_number: str, case_id: str) -> bool:
         checkbox.wait_for(state="attached", timeout=5_000)
         checkbox.evaluate("el => el.click()")
     except Exception as exc:
-        print(f"[{case_number}] ERROR â€“ checkbox: {exc}")
+        print(f"[{case_number}] ERROR --- checkbox: {exc}")
         return False
 
     time.sleep(1)
@@ -142,7 +145,7 @@ def navigate_to_documents_tab(page, case_number: str, case_id: str) -> bool:
         batch_btn.click()
         print(f"[{case_number}] Clicked batchActions")
     except Exception as exc:
-        print(f"[{case_number}] ERROR â€“ batchActions: {exc}")
+        print(f"[{case_number}] ERROR --- batchActions: {exc}")
         return False
 
     time.sleep(2)
@@ -152,19 +155,19 @@ def navigate_to_documents_tab(page, case_number: str, case_id: str) -> bool:
         page.wait_for_selector("div.public-tabs", state="attached", timeout=15_000)
         print(f"[{case_number}] Case detail loaded")
     except Exception as exc:
-        print(f"[{case_number}] ERROR â€“ case detail page did not load: {exc}")
+        print(f"[{case_number}] ERROR --- case detail page did not load: {exc}")
         return False
 
     time.sleep(1)
 
-    # 6. Click Documents tab (JS click â€” href is javascript:void(0))
+    # 6. Click Documents tab (JS click --- href is javascript:void(0))
     try:
         doc_tab = page.locator("a.public-tab[data-handler='dspCaseDocuments']").first
         doc_tab.wait_for(state="attached", timeout=10_000)
         doc_tab.evaluate("el => el.click()")
         print(f"[{case_number}] Clicked Documents tab")
     except Exception as exc:
-        print(f"[{case_number}] ERROR â€“ Documents tab: {exc}")
+        print(f"[{case_number}] ERROR --- Documents tab: {exc}")
         return False
 
     time.sleep(2)
@@ -173,7 +176,7 @@ def navigate_to_documents_tab(page, case_number: str, case_id: str) -> bool:
     try:
         page.wait_for_selector("table.table-public", timeout=10_000)
     except Exception as exc:
-        print(f"[{case_number}] ERROR â€“ documents table: {exc}")
+        print(f"[{case_number}] ERROR --- documents table: {exc}")
         return False
 
     time.sleep(1)
@@ -198,7 +201,7 @@ def find_and_click_view_button(page, case_number: str, document_id: str) -> bool
         except Exception:
             pass
 
-        # Not found â€” try next pagination page
+        # Not found --- try next pagination page
         try:
             next_page_num = page_num + 1
             next_link = page.locator(
@@ -211,7 +214,7 @@ def find_and_click_view_button(page, case_number: str, document_id: str) -> bool
             page.wait_for_selector("table.table-public", timeout=8_000)
             time.sleep(1)
         except Exception:
-            print(f"[{case_number}] ERROR â€“ View button for document_id={document_id} not found")
+            print(f"[{case_number}] ERROR --- View button for document_id={document_id} not found")
             return False
 
 
@@ -319,7 +322,7 @@ def main():
                                 print(f"[{case_number}] PDF current URL: {pdf_url}")
 
                     if not pdf_url:
-                        print(f"[{case_number}] ERROR – no PDF URL found for document_id={target['document_id']}")
+                        print(f"[{case_number}] ERROR - no PDF URL found for document_id={target['document_id']}")
                         continue
 
                     # Download PDF bytes using the browser session (shares cookies)
@@ -328,10 +331,10 @@ def main():
                         dest.write_bytes(api_resp.body())
                         print(f"[{case_number}] Saved: {dest}")
                     else:
-                        print(f"[{case_number}] ERROR – HTTP {api_resp.status} for {pdf_url}")
+                        print(f"[{case_number}] ERROR - HTTP {api_resp.status} for {pdf_url}")
 
                 except Exception as exc:
-                    print(f"[{case_number}] ERROR – {exc}")
+                    print(f"[{case_number}] ERROR - {exc}")
 
 
                 time.sleep(1)
@@ -350,3 +353,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+

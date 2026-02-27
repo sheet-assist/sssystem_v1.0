@@ -95,3 +95,6 @@ docs/_build/
 
 # Others
 *.pyc
+
+# Prospect documents
+prospects/

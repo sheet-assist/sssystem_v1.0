@@ -1,0 +1,13 @@
+{
+  "state": "",
+  "prospect_type": "",
+  "counties": [],
+  "auction_start_date": "",
+  "auction_end_date": "",
+  "case_numbers": ["2025A00753", "2025A00739"],
+  "skip_completed": false,
+  "retry_failed": true,
+  "dry_run": true,
+  "headless": true,
+  "output_file": "tdm_sync_output_debug.md"
+}

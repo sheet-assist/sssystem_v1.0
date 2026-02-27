@@ -685,19 +685,40 @@ def prospect_tdm_document_open(request, pk, tdm_doc_pk):
     """Serve a downloaded TDM document inline (opens in browser tab)."""
     from pathlib import Path
     from django.conf import settings as django_settings
+
     prospect = get_object_or_404(Prospect, pk=pk)
     if not (request.user.profile.can_view_prospects or request.user.profile.is_admin):
         return HttpResponseForbidden()
+
     tdm_doc = get_object_or_404(ProspectTDMDocument, pk=tdm_doc_pk, prospect=prospect)
     if not tdm_doc.is_downloaded or not tdm_doc.local_path:
         return HttpResponse("File not downloaded yet.", status=404)
-    base_dir = Path(django_settings.BASE_DIR) if hasattr(django_settings, 'BASE_DIR') else Path(__file__).resolve().parent.parent.parent
-    file_path = base_dir / tdm_doc.local_path
-    if not file_path.exists():
+
+    raw_path = (tdm_doc.local_path or "").strip()
+    normalized = raw_path.replace("\\", "/")
+    rel_path = Path(normalized)
+
+    media_root = Path(getattr(django_settings, "MEDIA_ROOT", "") or "").resolve() if getattr(django_settings, "MEDIA_ROOT", None) else None
+    base_dir = Path(getattr(django_settings, "BASE_DIR", Path(__file__).resolve().parent.parent.parent)).resolve()
+
+    candidates = []
+    if Path(raw_path).is_absolute():
+        candidates.append(Path(raw_path))
+    if media_root:
+        candidates.append(media_root / rel_path)
+    candidates.append(base_dir / rel_path)
+
+    # Backward-compat for old records stored as BASE_DIR-relative media paths.
+    if media_root and normalized.startswith("media/"):
+        candidates.append(media_root / Path(normalized[len("media/"):]))
+
+    file_path = next((p for p in candidates if p.exists()), None)
+    if not file_path:
         return HttpResponse("File not found on disk.", status=404)
+
     try:
         fname = file_path.name
-        return FileResponse(open(file_path, 'rb'), content_type='application/pdf', filename=fname)
+        return FileResponse(open(file_path, "rb"), content_type="application/pdf", filename=fname)
     except Exception:
         return HttpResponse(status=500)
 
@@ -1035,5 +1056,6 @@ class ProspectCaseCalendarView(ProspectsAccessMixin, TemplateView):
                 weeks.append(current_week)
                 current_week = []
         return weeks
+
 
 

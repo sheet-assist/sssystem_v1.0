@@ -223,7 +223,8 @@ def scrape_case_documents(page, case_number: str) -> dict:
             return result
     else:
         try:
-            search_btn.click()
+            # JS click avoids overlay intercepts that can block pointer events in headless
+            search_btn.evaluate("el => el.click()")
         except Exception as exc:
             result["error"] = f"Could not click search button: {exc}"
             print(f"[{case_number}] ERROR – {result['error']}")
@@ -417,3 +418,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
