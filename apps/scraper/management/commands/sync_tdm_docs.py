@@ -43,6 +43,7 @@ from tdm.download_surplus_affidavit_headless import (
 
 
 DOWNLOAD_TITLES = { "Surplus Claim/Affidavit",
+    "SURPLUS LETTER",
     "SURPLUS_LETTER",
     "Title Search",}
 
