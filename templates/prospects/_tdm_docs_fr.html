@@ -1,0 +1,34 @@
+{# TDM Documents Card — used both inline in detail.html and as a standalone fragment
+   rendered by prospect_tdm_docs_fragment for in-place DOM refresh after sync. #}
+<div class="card mb-3" id="tdm-docs-card">
+  <div class="card-header fw-semibold py-2 d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-file-earmark-check me-1"></i> TDM Documents</span>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span id="tdm-sync-status" class="small text-muted"></span>
+      {% if tdm_last_sync %}
+        <small class="text-muted fw-normal" style="font-size:.75rem;">Synced {{ tdm_last_sync|date:"m/d/Y H:i" }}</small>
+      {% endif %}
+      <button id="sync-tdm-btn"
+              class="btn btn-outline-primary btn-sm"
+              data-sync-url="{% url 'prospects:tdm_sync' object.pk %}"
+              data-status-url="{% url 'prospects:tdm_sync_status' object.pk %}"
+              data-fragment-url="{% url 'prospects:tdm_docs_fragment' object.pk %}">
+        <i class="bi bi-arrow-repeat"></i> Sync TDM
+      </button>
+    </div>
+  </div>
+
+  <ul class="list-group list-group-flush">
+    {% for doc in tdm_downloaded_docs %}
+    <li class="list-group-item py-1 px-3 small">
+      <a href="{% url 'prospects:tdm_document_open' object.pk doc.pk %}" target="_blank" rel="noopener"
+         class="fw-medium link-primary link-underline-opacity-0 link-underline-opacity-100-hover">
+        <i class="bi bi-file-earmark-pdf me-1 text-danger"></i>{{ doc.title }}
+      </a>
+      <div class="text-muted" style="font-size:.78rem;">{{ doc.downloaded_at|date:"m/d/Y H:i" }}</div>
+    </li>
+    {% empty %}
+    <li class="list-group-item py-2 px-3 small text-muted">No downloaded TDM documents yet.</li>
+    {% endfor %}
+  </ul>
+</div>
